@@ -182,7 +182,7 @@ def go_fuzz_test(
         testonly = 1,
     )
     go_binary(
-        # For inclusion in beacon fuzz project.
+        # For inclusion in beacon fuzz project, linkmode c-shared.
         name = name + "_c_shared",
         srcs = [name + "_diff_libfuzz_main"],
         deps = [name + "_lib_with_fuzzer"],
@@ -193,6 +193,19 @@ def go_fuzz_test(
         visibility = ["//visibility:private"],
         gc_goopts = ["-d=libfuzzer"],
         gc_linkopts=["-buildmode=c-shared"],
+        testonly = 1,
+    )
+    go_binary(
+        # For inclusion in beacon fuzz project, linkmode c-archive.
+        name = name + "_c_archive",
+        srcs = [name + "_diff_libfuzz_main"],
+        deps = [name + "_lib_with_fuzzer"],
+        linkmode = LINKMODE_C_ARCHIVE,
+        static = "on",
+        cgo = True,
+        tags = ["manual"] + tags,
+        visibility = ["//visibility:private"],
+        gc_goopts = ["-d=libfuzzer"],
         testonly = 1,
     )
     native.genrule(
