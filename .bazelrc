@@ -39,7 +39,9 @@ build:release --compilation_mode=opt
 build:llvm --crosstool_top=@llvm_toolchain//:toolchain
 build:llvm --define compiler=llvm
 build:llvm --copt -fno-sanitize=vptr,function
+build:llvm --copt -fPIC
 build:llvm --linkopt -fno-sanitize=vptr,function
+build:llvm --linkopt -fPIC
 
 build:asan --copt -fsanitize=address,undefined
 build:asan --copt -fno-omit-frame-pointer
@@ -65,6 +67,8 @@ build:fuzz --linkopt -Wl,--no-as-needed
 build:fuzz --define=gc_goopts=-d=libfuzzer
 build:fuzz --run_under=//tools:fuzz_wrapper
 build:fuzz --compilation_mode=opt
+build:fuzz --copt -fPIC
+build:fuzz --linkopt -fPIC
 
 test:fuzz --local_test_jobs="HOST_CPUS*.5"
 
