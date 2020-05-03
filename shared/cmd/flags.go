@@ -46,12 +46,6 @@ var (
 		Name:  "disable-monitoring",
 		Usage: "Disable monitoring service.",
 	}
-	// MonitoringPortFlag defines the http port used to serve prometheus metrics.
-	MonitoringPortFlag = &cli.Int64Flag{
-		Name:  "monitoring-port",
-		Usage: "Port used to listening and respond metrics for prometheus.",
-		Value: 8080,
-	}
 	// NoDiscovery specifies whether we are running a local network and have no need for connecting
 	// to the bootstrap nodes in the cloud
 	NoDiscovery = &cli.BoolFlag{
@@ -67,7 +61,7 @@ var (
 	BootstrapNode = &cli.StringFlag{
 		Name:  "bootstrap-node",
 		Usage: "The address of bootstrap node. Beacon node will connect for peer discovery via DHT.  Multiple nodes can be separated with a comma",
-		Value: "/dns4/prylabs.net/tcp/30001/p2p/16Uiu2HAm7Qwe19vz9WzD2Mxn7fXd1vgHHp4iccuyq7TxwRXoAGfc",
+		Value: "/dns4/prylabs.net/tcp/30001/p2p/16Uiu2HAm7Qwe19vz9WzD2Mxn7fXd1vgHHp4iccuyq7TxwRXoAGfc,enr:-Ku4QAGwOT9StqmwI5LHaIymIO4ooFKfNkEjWa0f1P8OsElgBh2Ijb-GrD_-b9W4kcPFcwmHQEy5RncqXNqdpVo1heoBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpAAAAAAAAAAAP__________gmlkgnY0gmlwhBLf22SJc2VjcDI1NmsxoQJxCnE6v_x2ekgY_uoE1rtwzvGy40mq9eD66XfHPBWgIIN1ZHCCD6A",
 	}
 	// RelayNode tells the beacon node which relay node to connect to.
 	RelayNode = &cli.StringFlag{
@@ -112,6 +106,12 @@ var (
 		Usage: "The file containing the private key to use in communications with other peers.",
 		Value: "",
 	}
+	// P2PMetadata defines a flag to specify the location of the peer metadata file.
+	P2PMetadata = &cli.StringFlag{
+		Name:  "p2p-metadata",
+		Usage: "The file containing the metadata to communicate with other peers.",
+		Value: "",
+	}
 	// P2PMaxPeers defines a flag to specify the max number of peers in libp2p.
 	P2PMaxPeers = &cli.Int64Flag{
 		Name:  "p2p-max-peers",
@@ -129,7 +129,13 @@ var (
 	P2PEncoding = &cli.StringFlag{
 		Name:  "p2p-encoding",
 		Usage: "The encoding format of messages sent over the wire. The default is 0, which represents ssz",
-		Value: "ssz",
+		Value: "ssz-snappy",
+	}
+	// P2PPubsub defines the pubsub router to use for p2p messages.
+	P2PPubsub = &cli.StringFlag{
+		Name:  "p2p-pubsub",
+		Usage: "The name of the pubsub router to use. Supported values are: gossip, flood, random",
+		Value: "gossip",
 	}
 	// ForceClearDB removes any previously stored data at the data directory.
 	ForceClearDB = &cli.BoolFlag{

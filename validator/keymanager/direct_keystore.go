@@ -3,9 +3,6 @@ package keymanager
 import (
 	"encoding/json"
 	"os"
-	"os/user"
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/prysmaticlabs/prysm/shared/bls"
@@ -46,8 +43,9 @@ func NewKeystore(input string) (KeyManager, string, error) {
 	}
 
 	if opts.Path == "" {
-		opts.Path = defaultValidatorDir()
+		opts.Path = accounts.DefaultValidatorDir()
 	}
+	log.WithField("keystorePath", opts.Path).Info("Checking validator keys")
 
 	exists, err := accounts.Exists(opts.Path)
 	if err != nil {
@@ -92,30 +90,4 @@ func NewKeystore(input string) (KeyManager, string, error) {
 		km.secretKeys[pubKey] = key.SecretKey
 	}
 	return km, "", nil
-}
-
-func homeDir() string {
-	if home := os.Getenv("HOME"); home != "" {
-		return home
-	}
-	if usr, err := user.Current(); err == nil {
-		return usr.HomeDir
-	}
-	return ""
-}
-
-func defaultValidatorDir() string {
-	// Try to place the data folder in the user's home dir
-	home := homeDir()
-	if home != "" {
-		if runtime.GOOS == "darwin" {
-			return filepath.Join(home, "Library", "Eth2Validators")
-		} else if runtime.GOOS == "windows" {
-			return filepath.Join(home, "AppData", "Roaming", "Eth2Validators")
-		} else {
-			return filepath.Join(home, ".eth2validators")
-		}
-	}
-	// As we cannot guess a stable location, return empty and handle later
-	return ""
 }

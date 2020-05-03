@@ -1,5 +1,6 @@
-// Package node defines a validator client which connects to a
-// full beacon node as part of the Ethereum Serenity specification.
+// Package node is the main process which handles the lifecycle of
+// the runtime services in a validator client process, gracefully shutting
+// everything down upon close.
 package node
 
 import (
@@ -89,12 +90,12 @@ func NewValidatorClient(ctx *cli.Context) (*ValidatorClient, error) {
 
 	clearFlag := ctx.Bool(cmd.ClearDB.Name)
 	forceClearFlag := ctx.Bool(cmd.ForceClearDB.Name)
+	dataDir := ctx.String(cmd.DataDirFlag.Name)
 	if clearFlag || forceClearFlag {
 		pubkeys, err := keyManager.FetchValidatingKeys()
 		if err != nil {
 			return nil, err
 		}
-		dataDir := ctx.String(cmd.DataDirFlag.Name)
 		if dataDir == "" {
 			dataDir = cmd.DefaultDataDir()
 		}
@@ -102,6 +103,7 @@ func NewValidatorClient(ctx *cli.Context) (*ValidatorClient, error) {
 			return nil, err
 		}
 	}
+	log.WithField("databasePath", dataDir).Info("Checking DB")
 
 	if err := ValidatorClient.registerPrometheusService(ctx); err != nil {
 		return nil, err
@@ -161,7 +163,7 @@ func (s *ValidatorClient) Close() {
 
 func (s *ValidatorClient) registerPrometheusService(ctx *cli.Context) error {
 	service := prometheus.NewPrometheusService(
-		fmt.Sprintf(":%d", ctx.Int64(cmd.MonitoringPortFlag.Name)),
+		fmt.Sprintf(":%d", ctx.Int64(flags.MonitoringPortFlag.Name)),
 		s.services,
 	)
 	logrus.AddHook(prometheus.NewLogrusCollector())
@@ -248,6 +250,8 @@ func selectKeyManager(ctx *cli.Context) (keymanager.KeyManager, error) {
 		km, help, err = keymanager.NewKeystore(opts)
 	case "wallet":
 		km, help, err = keymanager.NewWallet(opts)
+	case "remote":
+		km, help, err = keymanager.NewRemoteWallet(opts)
 	default:
 		return nil, fmt.Errorf("unknown keymanager %q", manager)
 	}

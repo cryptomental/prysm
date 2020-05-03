@@ -1,3 +1,5 @@
+// Package helpers defines helper functions to peer into
+// end to end processes and kill processes as needed.
 package helpers
 
 import (
@@ -140,5 +142,4 @@ func LogErrorOutput(t *testing.T, file io.Reader, title string, index int) {
 		}
 		t.Log(err)
 	}
-	t.Logf("===================== End of %s %d error output ====================\n", title, index)
 }

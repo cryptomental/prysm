@@ -2,6 +2,7 @@ package initialsync
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
@@ -14,6 +15,8 @@ import (
 	blockfeed "github.com/prysmaticlabs/prysm/beacon-chain/core/feed/block"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/helpers"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/state"
+	"github.com/prysmaticlabs/prysm/beacon-chain/p2p"
+	"github.com/prysmaticlabs/prysm/beacon-chain/state/stateutil"
 	prysmsync "github.com/prysmaticlabs/prysm/beacon-chain/sync"
 	p2ppb "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
 	"github.com/prysmaticlabs/prysm/shared/bytesutil"
@@ -78,20 +81,19 @@ func (s *Service) roundRobinSync(genesis time.Time) error {
 	// mitigation. We are already convinced that we are on the correct finalized chain. Any blocks
 	// we receive there after must build on the finalized chain or be considered invalid during
 	// fork choice resolution / block processing.
-	root, _, pids := s.p2p.Peers().BestFinalized(1 /* maxPeers */, s.highestFinalizedEpoch())
+	_, _, pids := s.p2p.Peers().BestFinalized(1 /* maxPeers */, s.highestFinalizedEpoch())
 	for len(pids) == 0 {
 		log.Info("Waiting for a suitable peer before syncing to the head of the chain")
 		time.Sleep(refreshTime)
-		root, _, pids = s.p2p.Peers().BestFinalized(1 /* maxPeers */, s.highestFinalizedEpoch())
+		_, _, pids = s.p2p.Peers().BestFinalized(1 /* maxPeers */, s.highestFinalizedEpoch())
 	}
 	best := pids[0]
 
 	for head := helpers.SlotsSince(genesis); s.chain.HeadSlot() < head; {
 		req := &p2ppb.BeaconBlocksByRangeRequest{
-			HeadBlockRoot: root,
-			StartSlot:     s.chain.HeadSlot() + 1,
-			Count:         mathutil.Min(helpers.SlotsSince(genesis)-s.chain.HeadSlot()+1, allowedBlocksPerSecond),
-			Step:          1,
+			StartSlot: s.chain.HeadSlot() + 1,
+			Count:     mathutil.Min(helpers.SlotsSince(genesis)-s.chain.HeadSlot()+1, allowedBlocksPerSecond),
+			Step:      1,
 		}
 
 		log.WithField("req", req).WithField("peer", best.Pretty()).Debug(
@@ -131,9 +133,8 @@ func (s *Service) requestBlocks(ctx context.Context, req *p2ppb.BeaconBlocksByRa
 		"start": req.StartSlot,
 		"count": req.Count,
 		"step":  req.Step,
-		"head":  fmt.Sprintf("%#x", req.HeadBlockRoot),
 	}).Debug("Requesting blocks")
-	stream, err := s.p2p.Send(ctx, req, pid)
+	stream, err := s.p2p.Send(ctx, req, p2p.RPCBlocksByRangeTopic, pid)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send request to peer")
 	}
@@ -180,6 +181,11 @@ func (s *Service) logSyncStatus(genesis time.Time, blk *eth.BeaconBlock, counter
 		rate = 1
 	}
 	timeRemaining := time.Duration(float64(helpers.SlotsSince(genesis)-blk.Slot)/rate) * time.Second
+	blockRoot := "unknown"
+	root, err := stateutil.BlockRoot(blk)
+	if err == nil {
+		blockRoot = fmt.Sprintf("0x%s...", hex.EncodeToString(root[:])[:8])
+	}
 	log.WithField(
 		"peers",
 		len(s.p2p.Peers().Connected()),
@@ -187,7 +193,8 @@ func (s *Service) logSyncStatus(genesis time.Time, blk *eth.BeaconBlock, counter
 		"blocksPerSecond",
 		fmt.Sprintf("%.1f", rate),
 	).Infof(
-		"Processing block %d/%d - estimated time remaining %s",
+		"Processing block %s %d/%d - estimated time remaining %s",
+		blockRoot,
 		blk.Slot,
 		helpers.SlotsSince(genesis),
 		timeRemaining,

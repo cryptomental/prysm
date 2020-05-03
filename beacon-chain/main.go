@@ -1,4 +1,4 @@
-// Package beacon-chain defines all the utilities needed for a beacon chain node.
+// Package beacon-chain defines the entire runtime of an eth2 beacon node.
 package main
 
 import (
@@ -7,6 +7,7 @@ import (
 	"runtime"
 	runtimeDebug "runtime/debug"
 
+	gethlog "github.com/ethereum/go-ethereum/log"
 	golog "github.com/ipfs/go-log"
 	joonix "github.com/joonix/log"
 	"github.com/prysmaticlabs/prysm/beacon-chain/flags"
@@ -38,7 +39,8 @@ var appFlags = []cli.Flag{
 	flags.ContractDeploymentBlock,
 	flags.SetGCPercent,
 	flags.UnsafeSync,
-	flags.EnableDiscv5,
+	flags.DisableDiscv5,
+	flags.BlockBatchLimit,
 	flags.InteropMockEth1DataVotesFlag,
 	flags.InteropGenesisStateFlag,
 	flags.InteropNumValidatorsFlag,
@@ -48,6 +50,7 @@ var appFlags = []cli.Flag{
 	flags.ArchiveBlocksFlag,
 	flags.ArchiveAttestationsFlag,
 	flags.SlotsPerArchivedPoint,
+	flags.EnableDebugRPCEndpoints,
 	cmd.BootstrapNode,
 	cmd.NoDiscovery,
 	cmd.StaticPeers,
@@ -59,15 +62,17 @@ var appFlags = []cli.Flag{
 	cmd.P2PHostDNS,
 	cmd.P2PMaxPeers,
 	cmd.P2PPrivKey,
+	cmd.P2PMetadata,
 	cmd.P2PWhitelist,
 	cmd.P2PEncoding,
+	cmd.P2PPubsub,
 	cmd.DataDirFlag,
 	cmd.VerbosityFlag,
 	cmd.EnableTracingFlag,
 	cmd.TracingProcessNameFlag,
 	cmd.TracingEndpointFlag,
 	cmd.TraceSampleFractionFlag,
-	cmd.MonitoringPortFlag,
+	flags.MonitoringPortFlag,
 	cmd.DisableMonitoringFlag,
 	cmd.ClearDB,
 	cmd.ForceClearDB,
@@ -166,7 +171,12 @@ func startNode(ctx *cli.Context) error {
 	}
 	logrus.SetLevel(level)
 	if level == logrus.TraceLevel {
+		// libp2p specific logging.
 		golog.SetAllLoggers(gologging.DEBUG)
+		// Geth specific logging.
+		glogger := gethlog.NewGlogHandler(gethlog.StreamHandler(os.Stderr, gethlog.TerminalFormat(true)))
+		glogger.Verbosity(gethlog.LvlTrace)
+		gethlog.Root().SetHandler(glogger)
 	}
 
 	beacon, err := node.NewBeaconNode(ctx)

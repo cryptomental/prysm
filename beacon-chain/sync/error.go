@@ -10,8 +10,9 @@ import (
 
 const genericError = "internal service error"
 const rateLimitedError = "rate limited"
+const stepError = "invalid range or step"
 
-var errWrongForkVersion = errors.New("wrong fork version")
+var errWrongForkDigestVersion = errors.New("wrong fork digest version")
 var errInvalidEpoch = errors.New("invalid epoch")
 
 var responseCodeSuccess = byte(0x00)

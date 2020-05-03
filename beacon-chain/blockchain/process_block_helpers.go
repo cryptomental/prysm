@@ -21,7 +21,12 @@ import (
 
 // CurrentSlot returns the current slot based on time.
 func (s *Service) CurrentSlot() uint64 {
-	return uint64(roughtime.Now().Unix()-s.genesisTime.Unix()) / params.BeaconConfig().SecondsPerSlot
+	now := roughtime.Now().Unix()
+	genesis := s.genesisTime.Unix()
+	if now < genesis {
+		return 0
+	}
+	return uint64(now-genesis) / params.BeaconConfig().SecondsPerSlot
 }
 
 // getBlockPreState returns the pre state of an incoming block. It uses the parent root of the block
@@ -38,7 +43,7 @@ func (s *Service) getBlockPreState(ctx context.Context, b *ethpb.BeaconBlock) (*
 	}
 
 	// Verify block slot time is not from the feature.
-	if err := helpers.VerifySlotTime(preState.GenesisTime(), b.Slot); err != nil {
+	if err := helpers.VerifySlotTime(preState.GenesisTime(), b.Slot, helpers.TimeShiftTolerance); err != nil {
 		return nil, err
 	}
 
@@ -61,7 +66,20 @@ func (s *Service) verifyBlkPreState(ctx context.Context, b *ethpb.BeaconBlock) (
 	defer span.End()
 
 	if featureconfig.Get().NewStateMgmt {
-		preState, err := s.stateGen.StateByRoot(ctx, bytesutil.ToBytes32(b.ParentRoot))
+		parentRoot := bytesutil.ToBytes32(b.ParentRoot)
+		// Loosen the check to HasBlock because state summary gets saved in batches
+		// during initial syncing. There's no risk given a state summary object is just a
+		// a subset of the block object.
+		if !s.stateGen.StateSummaryExists(ctx, parentRoot) && !s.beaconDB.HasBlock(ctx, parentRoot) {
+			return nil, errors.New("could not reconstruct parent state")
+		}
+		if !s.stateGen.HasState(ctx, parentRoot) {
+			if err := s.beaconDB.SaveBlocks(ctx, s.getInitSyncBlocks()); err != nil {
+				return nil, errors.Wrap(err, "could not save initial sync blocks")
+			}
+			s.clearInitSyncBlocks()
+		}
+		preState, err := s.stateGen.StateByRoot(ctx, parentRoot)
 		if err != nil {
 			return nil, errors.Wrapf(err, "could not get pre state for slot %d", b.Slot)
 		}
@@ -192,7 +210,7 @@ func (s *Service) rmStatesOlderThanLastFinalized(ctx context.Context, startSlot 
 	}
 
 	if err := s.beaconDB.DeleteStates(ctx, roots); err != nil {
-		return err
+		log.Warnf("Could not delete states: %v", err)
 	}
 
 	return nil

@@ -52,7 +52,7 @@ var appHelpFlagGroups = []flagGroup{
 			cmd.TracingProcessNameFlag,
 			cmd.TracingEndpointFlag,
 			cmd.TraceSampleFractionFlag,
-			cmd.MonitoringPortFlag,
+			flags.MonitoringPortFlag,
 			cmd.LogFormat,
 			cmd.LogFileName,
 			cmd.ConfigFileFlag,
@@ -72,7 +72,6 @@ var appHelpFlagGroups = []flagGroup{
 	{
 		Name: "validator",
 		Flags: []cli.Flag{
-			flags.NoCustomConfigFlag,
 			flags.BeaconRPCProviderFlag,
 			flags.CertFlag,
 			flags.KeyManager,

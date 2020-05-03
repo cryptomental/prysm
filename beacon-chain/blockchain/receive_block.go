@@ -116,7 +116,10 @@ func (s *Service) ReceiveBlockNoPubsub(ctx context.Context, block *ethpb.SignedB
 	})
 
 	// Reports on block and fork choice metrics.
-	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.finalizedCheckpt)
+	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.CurrentSlot(), s.finalizedCheckpt)
+
+	// Log block sync status.
+	logBlockSyncStatus(blockCopy.Block, root, s.finalizedCheckpt)
 
 	// Log state transition data.
 	logStateTransitionData(blockCopy.Block)
@@ -166,7 +169,10 @@ func (s *Service) ReceiveBlockNoPubsubForkchoice(ctx context.Context, block *eth
 	})
 
 	// Reports on block and fork choice metrics.
-	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.finalizedCheckpt)
+	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.CurrentSlot(), s.finalizedCheckpt)
+
+	// Log block sync status.
+	logBlockSyncStatus(blockCopy.Block, root, s.finalizedCheckpt)
 
 	// Log state transition data.
 	logStateTransitionData(blockCopy.Block)
@@ -222,7 +228,7 @@ func (s *Service) ReceiveBlockNoVerify(ctx context.Context, block *ethpb.SignedB
 	})
 
 	// Reports on blockCopy and fork choice metrics.
-	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.finalizedCheckpt)
+	reportSlotMetrics(blockCopy.Block.Slot, s.headSlot(), s.CurrentSlot(), s.finalizedCheckpt)
 
 	// Log state transition data.
 	log.WithFields(logrus.Fields{

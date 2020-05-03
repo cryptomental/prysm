@@ -17,18 +17,22 @@ import (
 // a BeaconBlockHeader struct according to the eth2
 // Simple Serialize specification.
 func BlockHeaderRoot(header *ethpb.BeaconBlockHeader) ([32]byte, error) {
-	fieldRoots := make([][]byte, 4)
+	fieldRoots := make([][]byte, 5)
 	if header != nil {
 		headerSlotBuf := make([]byte, 8)
 		binary.LittleEndian.PutUint64(headerSlotBuf, header.Slot)
 		headerSlotRoot := bytesutil.ToBytes32(headerSlotBuf)
 		fieldRoots[0] = headerSlotRoot[:]
+		proposerIdxBuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(proposerIdxBuf, header.ProposerIndex)
+		proposerIndexRoot := bytesutil.ToBytes32(proposerIdxBuf)
+		fieldRoots[1] = proposerIndexRoot[:]
 		parentRoot := bytesutil.ToBytes32(header.ParentRoot)
-		fieldRoots[1] = parentRoot[:]
+		fieldRoots[2] = parentRoot[:]
 		stateRoot := bytesutil.ToBytes32(header.StateRoot)
-		fieldRoots[2] = stateRoot[:]
+		fieldRoots[3] = stateRoot[:]
 		bodyRoot := bytesutil.ToBytes32(header.BodyRoot)
-		fieldRoots[3] = bodyRoot[:]
+		fieldRoots[4] = bodyRoot[:]
 	}
 	return bitwiseMerkleize(hashutil.CustomSHA256Hasher(), fieldRoots, uint64(len(fieldRoots)), uint64(len(fieldRoots)))
 }
@@ -38,21 +42,25 @@ func BlockRoot(blk *ethpb.BeaconBlock) ([32]byte, error) {
 	if !featureconfig.Get().EnableBlockHTR {
 		return ssz.HashTreeRoot(blk)
 	}
-	fieldRoots := make([][32]byte, 4)
+	fieldRoots := make([][32]byte, 5)
 	if blk != nil {
 		headerSlotBuf := make([]byte, 8)
 		binary.LittleEndian.PutUint64(headerSlotBuf, blk.Slot)
 		headerSlotRoot := bytesutil.ToBytes32(headerSlotBuf)
 		fieldRoots[0] = headerSlotRoot
+		proposerIdxBuf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(proposerIdxBuf, blk.ProposerIndex)
+		proposerIndexRoot := bytesutil.ToBytes32(proposerIdxBuf)
+		fieldRoots[1] = proposerIndexRoot
 		parentRoot := bytesutil.ToBytes32(blk.ParentRoot)
-		fieldRoots[1] = parentRoot
+		fieldRoots[2] = parentRoot
 		stateRoot := bytesutil.ToBytes32(blk.StateRoot)
-		fieldRoots[2] = stateRoot
+		fieldRoots[3] = stateRoot
 		bodyRoot, err := BlockBodyRoot(blk.Body)
 		if err != nil {
 			return [32]byte{}, err
 		}
-		fieldRoots[3] = bodyRoot
+		fieldRoots[4] = bodyRoot
 	}
 	return bitwiseMerkleizeArrays(hashutil.CustomSHA256Hasher(), fieldRoots, uint64(len(fieldRoots)), uint64(len(fieldRoots)))
 }
@@ -64,55 +72,56 @@ func BlockBodyRoot(body *ethpb.BeaconBlockBody) ([32]byte, error) {
 	}
 	hasher := hashutil.CustomSHA256Hasher()
 	fieldRoots := make([][32]byte, 8)
-	if body != nil {
-		rawRandao := bytesutil.ToBytes96(body.RandaoReveal)
-		packedRandao, err := pack([][]byte{rawRandao[:]})
-		if err != nil {
-			return [32]byte{}, err
-		}
-		randaoRoot, err := bitwiseMerkleize(hasher, packedRandao, uint64(len(packedRandao)), uint64(len(packedRandao)))
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[0] = randaoRoot
-
-		eth1Root, err := Eth1Root(hasher, body.Eth1Data)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[1] = eth1Root
-
-		graffitiRoot := bytesutil.ToBytes32(body.Graffiti)
-		fieldRoots[2] = graffitiRoot
-
-		proposerSlashingsRoot, err := ssz.HashTreeRootWithCapacity(body.ProposerSlashings, 16)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[3] = proposerSlashingsRoot
-		attesterSlashingsRoot, err := ssz.HashTreeRootWithCapacity(body.AttesterSlashings, 1)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[4] = attesterSlashingsRoot
-		attsRoot, err := blockAttestationRoot(body.Attestations)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[5] = attsRoot
-
-		depositRoot, err := ssz.HashTreeRootWithCapacity(body.Deposits, 16)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[6] = depositRoot
-
-		exitRoot, err := ssz.HashTreeRootWithCapacity(body.VoluntaryExits, 16)
-		if err != nil {
-			return [32]byte{}, err
-		}
-		fieldRoots[7] = exitRoot
+	if body == nil {
+		return [32]byte{}, errors.New("nil block body provided")
 	}
+	rawRandao := bytesutil.ToBytes96(body.RandaoReveal)
+	packedRandao, err := pack([][]byte{rawRandao[:]})
+	if err != nil {
+		return [32]byte{}, err
+	}
+	randaoRoot, err := bitwiseMerkleize(hasher, packedRandao, uint64(len(packedRandao)), uint64(len(packedRandao)))
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[0] = randaoRoot
+
+	eth1Root, err := Eth1Root(hasher, body.Eth1Data)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[1] = eth1Root
+
+	graffitiRoot := bytesutil.ToBytes32(body.Graffiti)
+	fieldRoots[2] = graffitiRoot
+
+	proposerSlashingsRoot, err := ssz.HashTreeRootWithCapacity(body.ProposerSlashings, 16)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[3] = proposerSlashingsRoot
+	attesterSlashingsRoot, err := ssz.HashTreeRootWithCapacity(body.AttesterSlashings, 1)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[4] = attesterSlashingsRoot
+	attsRoot, err := blockAttestationRoot(body.Attestations)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[5] = attsRoot
+
+	depositRoot, err := ssz.HashTreeRootWithCapacity(body.Deposits, 16)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[6] = depositRoot
+
+	exitRoot, err := ssz.HashTreeRootWithCapacity(body.VoluntaryExits, 16)
+	if err != nil {
+		return [32]byte{}, err
+	}
+	fieldRoots[7] = exitRoot
 	return bitwiseMerkleizeArrays(hasher, fieldRoots, uint64(len(fieldRoots)), uint64(len(fieldRoots)))
 }
 
@@ -182,7 +191,12 @@ func Eth1DataVotesRoot(eth1DataVotes []*ethpb.Eth1Data) ([32]byte, error) {
 	if err != nil {
 		return [32]byte{}, errors.Wrap(err, "could not chunk eth1 votes roots")
 	}
-	eth1VotesRootsRoot, err := bitwiseMerkleize(hasher, eth1Chunks, uint64(len(eth1Chunks)), params.BeaconConfig().SlotsPerEth1VotingPeriod)
+	eth1VotesRootsRoot, err := bitwiseMerkleize(
+		hasher,
+		eth1Chunks,
+		uint64(len(eth1Chunks)),
+		params.BeaconConfig().EpochsPerEth1VotingPeriod*params.BeaconConfig().SlotsPerEpoch,
+	)
 	if err != nil {
 		return [32]byte{}, errors.Wrap(err, "could not compute eth1data votes merkleization")
 	}

@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
@@ -89,17 +90,31 @@ func SlotsSinceEpochStarts(slot uint64) uint64 {
 	return slot - StartSlot(SlotToEpoch(slot))
 }
 
-// Allow for slots "from the future" within a certain tolerance.
-const timeShiftTolerance = 10 // ms
+// TimeShiftTolerance specifies the tolerance threshold for slots "from the future".
+const TimeShiftTolerance = 500 * time.Millisecond // ms
 
 // VerifySlotTime validates the input slot is not from the future.
-func VerifySlotTime(genesisTime uint64, slot uint64) error {
-	slotTime := genesisTime + slot*params.BeaconConfig().SecondsPerSlot
-	currentTime := uint64(roughtime.Now().Unix())
-	if slotTime > currentTime+timeShiftTolerance {
-		return fmt.Errorf("could not process slot from the future, slot time %d > current time %d", slotTime, currentTime)
+func VerifySlotTime(genesisTime uint64, slot uint64, timeTolerance time.Duration) error {
+	slotTime, err := SlotToTime(genesisTime, slot)
+	if err != nil {
+		return err
+	}
+	currentTime := roughtime.Now()
+	diff := slotTime.Sub(currentTime)
+
+	if diff > timeTolerance {
+		return fmt.Errorf("could not process slot from the future, slot time %s > current time %s", slotTime, currentTime)
 	}
 	return nil
+}
+
+// SlotToTime takes the given slot and genesis time to determine the start time of the slot.
+func SlotToTime(genesisTimeSec uint64, slot uint64) (time.Time, error) {
+	if slot >= math.MaxInt64 {
+		return time.Unix(0, 0), fmt.Errorf("slot (%d) is in the far distant future", slot)
+	}
+	timeSinceGenesis := slot * params.BeaconConfig().SecondsPerSlot
+	return time.Unix(int64(genesisTimeSec+timeSinceGenesis), 0), nil
 }
 
 // SlotsSince computes the number of time slots that have occurred since the given timestamp.

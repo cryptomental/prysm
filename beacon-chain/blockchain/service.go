@@ -1,6 +1,6 @@
-// Package blockchain defines the life-cycle and status of the beacon chain
-// as well as the Ethereum Serenity beacon chain fork-choice rule based on
-// Casper Proof of Stake finality.
+// Package blockchain defines the life-cycle of the blockchain at the core of
+// eth2, including processing of new blocks and attestations using casper
+// proof of stake.
 package blockchain
 
 import (
@@ -192,7 +192,8 @@ func (s *Service) Start() {
 		s.stateNotifier.StateFeed().Send(&feed.Event{
 			Type: statefeed.Initialized,
 			Data: &statefeed.InitializedData{
-				StartTime: s.genesisTime,
+				StartTime:             s.genesisTime,
+				GenesisValidatorsRoot: beaconState.GenesisValidatorRoot(),
 			},
 		})
 	} else {
@@ -237,13 +238,15 @@ func (s *Service) Start() {
 // deposit contract, initializes the beacon chain's state, and kicks off the beacon chain.
 func (s *Service) processChainStartTime(ctx context.Context, genesisTime time.Time) {
 	preGenesisState := s.chainStartFetcher.PreGenesisState()
-	if err := s.initializeBeaconChain(ctx, genesisTime, preGenesisState, s.chainStartFetcher.ChainStartEth1Data()); err != nil {
+	initializedState, err := s.initializeBeaconChain(ctx, genesisTime, preGenesisState, s.chainStartFetcher.ChainStartEth1Data())
+	if err != nil {
 		log.Fatalf("Could not initialize beacon chain: %v", err)
 	}
 	s.stateNotifier.StateFeed().Send(&feed.Event{
 		Type: statefeed.Initialized,
 		Data: &statefeed.InitializedData{
-			StartTime: genesisTime,
+			StartTime:             genesisTime,
+			GenesisValidatorsRoot: initializedState.GenesisValidatorRoot(),
 		},
 	})
 }
@@ -255,7 +258,7 @@ func (s *Service) initializeBeaconChain(
 	ctx context.Context,
 	genesisTime time.Time,
 	preGenesisState *stateTrie.BeaconState,
-	eth1data *ethpb.Eth1Data) error {
+	eth1data *ethpb.Eth1Data) (*stateTrie.BeaconState, error) {
 	_, span := trace.StartSpan(context.Background(), "beacon-chain.Service.initializeBeaconChain")
 	defer span.End()
 	s.genesisTime = genesisTime
@@ -263,11 +266,11 @@ func (s *Service) initializeBeaconChain(
 
 	genesisState, err := state.OptimizedGenesisBeaconState(unixTime, preGenesisState, eth1data)
 	if err != nil {
-		return errors.Wrap(err, "could not initialize genesis state")
+		return nil, errors.Wrap(err, "could not initialize genesis state")
 	}
 
 	if err := s.saveGenesisData(ctx, genesisState); err != nil {
-		return errors.Wrap(err, "could not save genesis data")
+		return nil, errors.Wrap(err, "could not save genesis data")
 	}
 
 	log.Info("Initialized beacon chain genesis state")
@@ -277,15 +280,15 @@ func (s *Service) initializeBeaconChain(
 
 	// Update committee shuffled indices for genesis epoch.
 	if err := helpers.UpdateCommitteeCache(genesisState, 0 /* genesis epoch */); err != nil {
-		return err
+		return nil, err
 	}
 	if err := helpers.UpdateProposerIndicesInCache(genesisState, 0 /* genesis epoch */); err != nil {
-		return err
+		return nil, err
 	}
 
 	s.opsService.SetGenesisTime(genesisState.GenesisTime())
 
-	return nil
+	return genesisState, nil
 }
 
 // Stop the blockchain service's main event loop and associated goroutines.

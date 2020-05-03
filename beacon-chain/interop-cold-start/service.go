@@ -1,3 +1,6 @@
+// Package interopcoldstart allows for spinning up a deterministic
+// local chain without the need for eth1 deposits useful for
+// local client development and interoperability testing.
 package interopcoldstart
 
 import (
@@ -165,6 +168,12 @@ func (s *Service) saveGenesisState(ctx context.Context, genesisState *stateTrie.
 
 	if err := s.beaconDB.SaveBlock(ctx, genesisBlk); err != nil {
 		return errors.Wrap(err, "could not save genesis block")
+	}
+	if err := s.beaconDB.SaveStateSummary(ctx, &pb.StateSummary{
+		Slot: 0,
+		Root: genesisBlkRoot[:],
+	}); err != nil {
+		return err
 	}
 	if err := s.beaconDB.SaveState(ctx, genesisState, genesisBlkRoot); err != nil {
 		return errors.Wrap(err, "could not save genesis state")

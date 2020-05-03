@@ -7,9 +7,12 @@ import (
 	fuzz "github.com/google/gofuzz"
 	eth "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
-	ethereum_beacon_p2p_v1 "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
 	pb "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
-	"github.com/prysmaticlabs/prysm/shared/bytesutil"
+	"github.com/prysmaticlabs/prysm/shared/params"
+
+	//"github.com/prysmaticlabs/prysm/beacon-chain/core/blocks"
+	beaconstate "github.com/prysmaticlabs/prysm/beacon-chain/state"
+	ethereum_beacon_p2p_v1 "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
 )
 
 func TestFuzzProcessAttestationNoVerify_10000(t *testing.T) {
@@ -21,8 +24,9 @@ func TestFuzzProcessAttestationNoVerify_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(att)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		_, _ = ProcessAttestationNoVerify(ctx, s, att)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		_, err = ProcessAttestationNoVerify(ctx, s, att)
+		_ = err
 	}
 }
 
@@ -35,33 +39,9 @@ func TestFuzzProcessBlockHeader_10000(t *testing.T) {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(block)
 
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		_, _ = ProcessBlockHeader(s, block)
-	}
-}
-
-func TestFuzzverifySigningRoot_10000(t *testing.T) {
-	fuzzer := fuzz.NewWithSeed(0)
-	state := &ethereum_beacon_p2p_v1.BeaconState{}
-	pubkey := [48]byte{}
-	sig := [96]byte{}
-	domain := [4]byte{}
-	p := []byte{}
-	s := []byte{}
-	d := uint64(0)
-	for i := 0; i < 10000; i++ {
-		fuzzer.Fuzz(state)
-		fuzzer.Fuzz(&pubkey)
-		fuzzer.Fuzz(&sig)
-		fuzzer.Fuzz(&domain)
-		fuzzer.Fuzz(state)
-		fuzzer.Fuzz(&p)
-		fuzzer.Fuzz(&s)
-		fuzzer.Fuzz(&d)
-		domain := bytesutil.FromBytes4(domain[:])
-		verifySigningRoot(state, pubkey[:], sig[:], domain)
-		verifySigningRoot(state, p, s, d)
-
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		_, err = ProcessBlockHeader(s, block)
+		_ = err
 	}
 }
 
@@ -73,7 +53,7 @@ func TestFuzzverifyDepositDataSigningRoot_10000(t *testing.T) {
 	domain := [4]byte{}
 	p := []byte{}
 	s := []byte{}
-	d := uint64(0)
+	d := []byte{}
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(&ba)
 		fuzzer.Fuzz(&pubkey)
@@ -82,9 +62,9 @@ func TestFuzzverifyDepositDataSigningRoot_10000(t *testing.T) {
 		fuzzer.Fuzz(&p)
 		fuzzer.Fuzz(&s)
 		fuzzer.Fuzz(&d)
-		domain := bytesutil.FromBytes4(domain[:])
-		verifySignature(ba, pubkey[:], sig[:], domain)
-		verifySignature(ba, p, s, d)
+		err := verifySignature(ba, pubkey[:], sig[:], domain[:])
+		err = verifySignature(ba, p, s, d)
+		_ = err
 	}
 }
 
@@ -122,10 +102,11 @@ func TestFuzzEth1DataHasEnoughSupport_10000(t *testing.T) {
 	for i := 0; i < 100000; i++ {
 		fuzzer.Fuzz(eth1data)
 		fuzzer.Fuzz(&stateVotes)
-		s, _ := stateTrie.InitializeFromProto(&ethereum_beacon_p2p_v1.BeaconState{
+		s, err := beaconstate.InitializeFromProto(&ethereum_beacon_p2p_v1.BeaconState{
 			Eth1DataVotes: stateVotes,
 		})
-		Eth1DataHasEnoughSupport(s, eth1data)
+		_, err = Eth1DataHasEnoughSupport(s, eth1data)
+		_ = err
 	}
 
 }
@@ -138,8 +119,9 @@ func TestFuzzProcessBlockHeaderNoVerify_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(block)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		_, _ = ProcessBlockHeaderNoVerify(s, block)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		_, err = ProcessBlockHeaderNoVerify(s, block)
+		_ = err
 	}
 }
 
@@ -151,7 +133,7 @@ func TestFuzzProcessRandao_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessRandao(s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -167,7 +149,7 @@ func TestFuzzProcessRandaoNoVerify_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessRandaoNoVerify(s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -183,7 +165,7 @@ func TestFuzzProcessProposerSlashings_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessProposerSlashings(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -198,8 +180,9 @@ func TestFuzzVerifyProposerSlashing_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(proposerSlashing)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		VerifyProposerSlashing(s, proposerSlashing)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		err = VerifyProposerSlashing(s, proposerSlashing)
+		_ = err
 	}
 }
 
@@ -211,7 +194,7 @@ func TestFuzzProcessAttesterSlashings_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessAttesterSlashings(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -227,8 +210,9 @@ func TestFuzzVerifyAttesterSlashing_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(attesterSlashing)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		VerifyAttesterSlashing(ctx, s, attesterSlashing)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		err = VerifyAttesterSlashing(ctx, s, attesterSlashing)
+		_ = err
 	}
 }
 
@@ -262,7 +246,7 @@ func TestFuzzProcessAttestations_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessAttestations(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -278,7 +262,7 @@ func TestFuzzProcessAttestationsNoVerify_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessAttestationsNoVerify(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -294,7 +278,7 @@ func TestFuzzProcessAttestation_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(attestation)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessAttestation(ctx, s, attestation)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, attestation)
@@ -310,8 +294,9 @@ func TestFuzzVerifyIndexedAttestationn_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(idxAttestation)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		VerifyIndexedAttestation(ctx, s, idxAttestation)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		err = VerifyIndexedAttestation(ctx, s, idxAttestation)
+		_ = err
 	}
 }
 
@@ -323,8 +308,9 @@ func TestFuzzVerifyAttestation_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(attestation)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		VerifyAttestation(ctx, s, attestation)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		err = VerifyAttestation(ctx, s, attestation)
+		_ = err
 	}
 }
 
@@ -336,7 +322,7 @@ func TestFuzzProcessDeposits_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessDeposits(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -353,7 +339,7 @@ func TestFuzzProcessPreGenesisDeposit_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(deposit)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessPreGenesisDeposit(ctx, s, deposit)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, deposit)
@@ -369,7 +355,7 @@ func TestFuzzProcessDeposit_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(deposit)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessDeposit(s, deposit)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, deposit)
@@ -384,8 +370,9 @@ func TestFuzzverifyDeposit_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(deposit)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
-		verifyDeposit(s, deposit)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
+		err = verifyDeposit(s, deposit)
+		_ = err
 	}
 }
 
@@ -397,7 +384,7 @@ func TestFuzzProcessVoluntaryExits_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessVoluntaryExits(ctx, s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -412,7 +399,7 @@ func TestFuzzProcessVoluntaryExitsNoVerify_10000(t *testing.T) {
 	for i := 0; i < 10000; i++ {
 		fuzzer.Fuzz(state)
 		fuzzer.Fuzz(blockBody)
-		s, _ := stateTrie.InitializeFromProtoUnsafe(state)
+		s, err := beaconstate.InitializeFromProtoUnsafe(state)
 		r, err := ProcessVoluntaryExitsNoVerify(s, blockBody)
 		if err != nil && r != nil {
 			t.Fatalf("return value should be nil on err. found: %v on error: %v for state: %v and block: %v", r, err, state, blockBody)
@@ -432,6 +419,7 @@ func TestFuzzVerifyExit_10000(t *testing.T) {
 		fuzzer.Fuzz(val)
 		fuzzer.Fuzz(fork)
 		fuzzer.Fuzz(&slot)
-		VerifyExit(val, slot, fork, ve)
+		err := VerifyExit(val, slot, fork, ve, params.BeaconConfig().ZeroHash[:])
+		_ = err
 	}
 }

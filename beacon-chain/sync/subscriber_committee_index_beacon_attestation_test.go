@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	eth "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	"github.com/prysmaticlabs/go-bitfield"
 	"github.com/prysmaticlabs/go-ssz"
@@ -15,14 +16,15 @@ import (
 	dbtest "github.com/prysmaticlabs/prysm/beacon-chain/db/testing"
 	"github.com/prysmaticlabs/prysm/beacon-chain/operations/attestations"
 	p2ptest "github.com/prysmaticlabs/prysm/beacon-chain/p2p/testing"
-	beaconstate "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	mockSync "github.com/prysmaticlabs/prysm/beacon-chain/sync/initial-sync/testing"
-	pb "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
+	"github.com/prysmaticlabs/prysm/shared/featureconfig"
 	"github.com/prysmaticlabs/prysm/shared/testutil"
 )
 
 func TestService_committeeIndexBeaconAttestationSubscriber_ValidMessage(t *testing.T) {
 	p := p2ptest.NewTestP2P(t)
+	resetCfg := featureconfig.InitWithReset(&featureconfig.Flags{DisableDynamicCommitteeSubnets: true})
+	defer resetCfg()
 
 	ctx := context.Background()
 	db := dbtest.SetupDB(t)
@@ -42,24 +44,37 @@ func TestService_committeeIndexBeaconAttestationSubscriber_ValidMessage(t *testi
 	if err := db.SaveBlock(ctx, blk); err != nil {
 		t.Fatal(err)
 	}
-	savedState, _ := beaconstate.InitializeFromProto(&pb.BeaconState{})
-	db.SaveState(context.Background(), savedState, root)
 
+	savedState := testutil.NewBeaconState()
+	if err := db.SaveState(context.Background(), savedState, root); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := lru.New(10)
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := &Service{
 		attPool: attestations.NewPool(),
 		chain: &mock.ChainService{
 			State:            s,
 			Genesis:          time.Now(),
 			ValidAttestation: true,
+			ValidatorsRoot:   [32]byte{'A'},
 		},
-		chainStarted:        true,
-		p2p:                 p,
-		db:                  db,
-		ctx:                 ctx,
-		stateNotifier:       (&mock.ChainService{}).StateNotifier(),
-		attestationNotifier: (&mock.ChainService{}).OperationNotifier(),
-		initialSync:         &mockSync.Sync{IsSyncing: false},
-		stateSummaryCache:   cache.NewStateSummaryCache(),
+		chainStarted:         true,
+		p2p:                  p,
+		db:                   db,
+		ctx:                  ctx,
+		stateNotifier:        (&mock.ChainService{}).StateNotifier(),
+		attestationNotifier:  (&mock.ChainService{}).OperationNotifier(),
+		initialSync:          &mockSync.Sync{IsSyncing: false},
+		seenAttestationCache: c,
+		stateSummaryCache:    cache.NewStateSummaryCache(),
+	}
+	p.Digest, err = r.forkDigest()
+	if err != nil {
+		t.Fatal(err)
 	}
 	r.registerSubscribers()
 	r.stateNotifier.StateFeed().Send(&feed.Event{
@@ -75,10 +90,10 @@ func TestService_committeeIndexBeaconAttestationSubscriber_ValidMessage(t *testi
 			BeaconBlockRoot: root[:],
 		},
 		AggregationBits: bitfield.Bitlist{0b0101},
-		Signature:       sKeys[0].Sign([]byte("foo"), 0).Marshal(),
+		Signature:       sKeys[0].Sign([]byte("foo")).Marshal(),
 	}
 
-	p.ReceivePubSub("/eth2/committee_index0_beacon_attestation", att)
+	p.ReceivePubSub("/eth2/%x/committee_index0_beacon_attestation", att)
 
 	time.Sleep(time.Second)
 

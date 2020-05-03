@@ -1,3 +1,6 @@
+// Package state contains types for state operation-specific events fired
+// during the runtime of a beacon node such state initialization, state updates,
+// and chain start.
 package state
 
 import "time"
@@ -9,6 +12,8 @@ const (
 	ChainStarted
 	// Initialized is sent when the internal beacon node's state is ready to be accessed.
 	Initialized
+	// Synced is sent when the beacon node has completed syncing and is ready to participate in the network.
+	Synced
 )
 
 // BlockProcessedData is the data sent with BlockProcessed events.
@@ -27,8 +32,16 @@ type ChainStartedData struct {
 	StartTime time.Time
 }
 
+// SyncedData is the data sent with Synced events.
+type SyncedData struct {
+	// StartTime is the time at which the chain started.
+	StartTime time.Time
+}
+
 // InitializedData is the data sent with Initialized events.
 type InitializedData struct {
 	// StartTime is the time at which the chain started.
 	StartTime time.Time
+	// GenesisValidatorsRoot represents ssz.HashTreeRoot(state.validators).
+	GenesisValidatorsRoot []byte
 }

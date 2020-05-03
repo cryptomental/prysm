@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"testing"
@@ -28,17 +29,25 @@ func TestService_Broadcast(t *testing.T) {
 		cfg: &Config{
 			Encoding: "ssz",
 		},
+		genesisTime:           time.Now(),
+		genesisValidatorsRoot: []byte{'A'},
 	}
 
 	msg := &testpb.TestSimpleMessage{
 		Bar: 55,
 	}
 
+	topic := "/eth2/%x/testing"
 	// Set a test gossip mapping for testpb.TestSimpleMessage.
-	GossipTypeMapping[reflect.TypeOf(msg)] = "/testing"
+	GossipTypeMapping[reflect.TypeOf(msg)] = topic
+	digest, err := p.forkDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	topic = fmt.Sprintf(topic, digest)
 
 	// External peer subscribes to the topic.
-	topic := "/testing" + p.Encoding().ProtocolSuffix()
+	topic += p.Encoding().ProtocolSuffix()
 	sub, err := p2.PubSub().Subscribe(topic)
 	if err != nil {
 		t.Fatal(err)
@@ -49,24 +58,24 @@ func TestService_Broadcast(t *testing.T) {
 	// Async listen for the pubsub, must be before the broadcast.
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func() {
+	go func(tt *testing.T) {
 		defer wg.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
 		incomingMessage, err := sub.Next(ctx)
 		if err != nil {
-			t.Fatal(err)
+			tt.Fatal(err)
 		}
 
 		result := &testpb.TestSimpleMessage{}
-		if err := p.Encoding().Decode(incomingMessage.Data, result); err != nil {
-			t.Fatal(err)
+		if err := p.Encoding().DecodeGossip(incomingMessage.Data, result); err != nil {
+			tt.Fatal(err)
 		}
 		if !proto.Equal(result, msg) {
-			t.Errorf("Did not receive expected message, got %+v, wanted %+v", result, msg)
+			tt.Errorf("Did not receive expected message, got %+v, wanted %+v", result, msg)
 		}
-	}()
+	}(t)
 
 	// Broadcast to peers and wait.
 	if err := p.Broadcast(context.Background(), msg); err != nil {
@@ -78,7 +87,10 @@ func TestService_Broadcast(t *testing.T) {
 }
 
 func TestService_Broadcast_ReturnsErr_TopicNotMapped(t *testing.T) {
-	p := Service{}
+	p := Service{
+		genesisTime:           time.Now(),
+		genesisValidatorsRoot: []byte{'A'},
+	}
 	if err := p.Broadcast(context.Background(), &testpb.AddressBook{}); err != ErrMessageNotMapped {
 		t.Fatalf("Expected error %v, got %v", ErrMessageNotMapped, err)
 	}
@@ -99,7 +111,7 @@ func TestService_Attestation_Subnet(t *testing.T) {
 					CommitteeIndex: 0,
 				},
 			},
-			topic: "/eth2/committee_index0_beacon_attestation",
+			topic: "/eth2/00000000/committee_index0_beacon_attestation",
 		},
 		{
 			att: &eth.Attestation{
@@ -107,7 +119,7 @@ func TestService_Attestation_Subnet(t *testing.T) {
 					CommitteeIndex: 11,
 				},
 			},
-			topic: "/eth2/committee_index11_beacon_attestation",
+			topic: "/eth2/00000000/committee_index11_beacon_attestation",
 		},
 		{
 			att: &eth.Attestation{
@@ -115,7 +127,7 @@ func TestService_Attestation_Subnet(t *testing.T) {
 					CommitteeIndex: 55,
 				},
 			},
-			topic: "/eth2/committee_index55_beacon_attestation",
+			topic: "/eth2/00000000/committee_index55_beacon_attestation",
 		},
 		{
 			att:   &eth.Attestation{},
@@ -126,7 +138,7 @@ func TestService_Attestation_Subnet(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if res := attestationToTopic(tt.att); res != tt.topic {
+		if res := attestationToTopic(tt.att, [4]byte{} /* fork digest */); res != tt.topic {
 			t.Errorf("Wrong topic, got %s wanted %s", res, tt.topic)
 		}
 	}

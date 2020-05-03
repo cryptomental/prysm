@@ -12,7 +12,8 @@ The process for implementing new features using this package is as follows:
 	cfg := &featureconfig.Flags{
 		VerifyAttestationSigs: true,
 	}
-	featureconfig.Init(cfg)
+	resetCfg := featureconfig.InitWithReset(cfg)
+	defer resetCfg()
 	6. Add the string for the flags that should be running within E2E to E2EValidatorFlags
 	and E2EBeaconChainFlags.
 */
@@ -28,11 +29,10 @@ var log = logrus.WithField("prefix", "flags")
 
 // Flags is a struct to represent which features the client will perform on runtime.
 type Flags struct {
-	NoCustomConfig                             bool // NoCustomConfigFlag determines whether to launch a beacon chain using real parameters or demo parameters.
 	MinimalConfig                              bool // MinimalConfig as defined in the spec.
 	WriteSSZStateTransitions                   bool // WriteSSZStateTransitions to tmp directory.
 	InitSyncNoVerify                           bool // InitSyncNoVerify when initial syncing w/o verifying block's contents.
-	EnableDynamicCommitteeSubnets              bool // Enables dynamic attestation committee subnets via p2p.
+	DisableDynamicCommitteeSubnets             bool // Disables dynamic attestation committee subnets via p2p.
 	SkipBLSVerify                              bool // Skips BLS verification across the runtime.
 	EnableBackupWebhook                        bool // EnableBackupWebhook to allow database backups to trigger from monitoring port /db/backup.
 	PruneEpochBoundaryStates                   bool // PruneEpochBoundaryStates prunes the epoch boundary state before last finalized check point.
@@ -47,11 +47,13 @@ type Flags struct {
 	CheckHeadState                             bool // CheckHeadState checks the current headstate before retrieving the desired state from the db.
 	EnableNoise                                bool // EnableNoise enables the beacon node to use NOISE instead of SECIO when performing a handshake with another peer.
 	DontPruneStateStartUp                      bool // DontPruneStateStartUp disables pruning state upon beacon node start up.
-	NewStateMgmt                               bool // NewStateMgmt enables the new experimental state mgmt service.
+	NewStateMgmt                               bool // NewStateMgmt enables the new state mgmt service.
 	DisableInitSyncQueue                       bool // DisableInitSyncQueue disables the new initial sync implementation.
 	EnableFieldTrie                            bool // EnableFieldTrie enables the state from using field specific tries when computing the root.
 	EnableBlockHTR                             bool // EnableBlockHTR enables custom hashing of our beacon blocks.
 	NoInitSyncBatchSaveBlocks                  bool // NoInitSyncBatchSaveBlocks disables batch save blocks mode during initial syncing.
+	EnableStateRefCopy                         bool // EnableStateRefCopy copies the references to objects instead of the objects themselves when copying state fields.
+	WaitForSynced                              bool // WaitForSynced uses WaitForSynced in validator startup to ensure it can communicate with the beacon node as soon as possible.
 	// DisableForkChoice disables using LMD-GHOST fork choice to update
 	// the head of the chain based on attestations and instead accepts any valid received block
 	// as the chain head. UNSAFE, use with caution.
@@ -85,12 +87,63 @@ func Init(c *Flags) {
 	featureConfig = c
 }
 
+// InitWithReset sets the global config and returns function that is used to reset configuration.
+func InitWithReset(c *Flags) func() {
+	resetFunc := func() {
+		Init(&Flags{})
+	}
+	Init(c)
+	return resetFunc
+}
+
+// Copy returns copy of the config object.
+func (c *Flags) Copy() *Flags {
+	return &Flags{
+		MinimalConfig:                              c.MinimalConfig,
+		WriteSSZStateTransitions:                   c.WriteSSZStateTransitions,
+		InitSyncNoVerify:                           c.InitSyncNoVerify,
+		DisableDynamicCommitteeSubnets:             c.DisableDynamicCommitteeSubnets,
+		SkipBLSVerify:                              c.SkipBLSVerify,
+		EnableBackupWebhook:                        c.EnableStateRefCopy,
+		PruneEpochBoundaryStates:                   c.PruneEpochBoundaryStates,
+		EnableSnappyDBCompression:                  c.EnableSnappyDBCompression,
+		ProtectProposer:                            c.ProtectProposer,
+		ProtectAttester:                            c.ProtectAttester,
+		DisableStrictAttestationPubsubVerification: c.DisableStrictAttestationPubsubVerification,
+		DisableUpdateHeadPerAttestation:            c.DisableUpdateHeadPerAttestation,
+		EnableByteMempool:                          c.EnableByteMempool,
+		EnableDomainDataCache:                      c.EnableDomainDataCache,
+		EnableStateGenSigVerify:                    c.EnableStateGenSigVerify,
+		CheckHeadState:                             c.CheckHeadState,
+		EnableNoise:                                c.EnableNoise,
+		DontPruneStateStartUp:                      c.DontPruneStateStartUp,
+		NewStateMgmt:                               c.NewStateMgmt,
+		DisableInitSyncQueue:                       c.DisableInitSyncQueue,
+		EnableFieldTrie:                            c.EnableFieldTrie,
+		EnableBlockHTR:                             c.EnableBlockHTR,
+		NoInitSyncBatchSaveBlocks:                  c.NoInitSyncBatchSaveBlocks,
+		EnableStateRefCopy:                         c.EnableStateRefCopy,
+		WaitForSynced:                              c.WaitForSynced,
+		DisableForkChoice:                          c.DisableForkChoice,
+		BroadcastSlashings:                         c.BroadcastSlashings,
+		EnableSSZCache:                             c.EnableSSZCache,
+		EnableEth1DataVoteCache:                    c.EnableEth1DataVoteCache,
+		EnableSlasherConnection:                    c.EnableSlasherConnection,
+		EnableBlockTreeCache:                       c.EnableBlockTreeCache,
+		KafkaBootstrapServers:                      c.KafkaBootstrapServers,
+		CustomGenesisDelay:                         c.CustomGenesisDelay,
+	}
+}
+
 // ConfigureBeaconChain sets the global config based
 // on what flags are enabled for the beacon-chain client.
 func ConfigureBeaconChain(ctx *cli.Context) {
 	complainOnDeprecatedFlags(ctx)
 	cfg := &Flags{}
 	cfg = configureConfig(ctx, cfg)
+	if ctx.Bool(devModeFlag.Name) {
+		enableDevModeFlags(ctx)
+	}
 	delay := params.BeaconConfig().MinGenesisDelay
 	if ctx.IsSet(customGenesisDelayFlag.Name) {
 		delay = ctx.Uint64(customGenesisDelayFlag.Name)
@@ -105,9 +158,9 @@ func ConfigureBeaconChain(ctx *cli.Context) {
 		log.Warn("UNSAFE: Disabled fork choice for updating chain head")
 		cfg.DisableForkChoice = true
 	}
-	if ctx.Bool(enableDynamicCommitteeSubnets.Name) {
-		log.Warn("Enabled dynamic attestation committee subnets")
-		cfg.EnableDynamicCommitteeSubnets = true
+	if ctx.Bool(disableDynamicCommitteeSubnets.Name) {
+		log.Warn("Disabled dynamic attestation committee subnets")
+		cfg.DisableDynamicCommitteeSubnets = true
 	}
 	cfg.EnableSSZCache = true
 	if ctx.Bool(disableSSZCache.Name) {
@@ -172,8 +225,8 @@ func ConfigureBeaconChain(ctx *cli.Context) {
 		log.Warn("Not enabling state pruning upon start up")
 		cfg.DontPruneStateStartUp = true
 	}
-	if ctx.Bool(newStateMgmt.Name) {
-		log.Warn("Enabling experimental state management service")
+	if ctx.Bool(enableNewStateMgmt.Name) {
+		log.Warn("Enabling state management service")
 		cfg.NewStateMgmt = true
 	}
 	if ctx.Bool(disableInitSyncQueue.Name) {
@@ -192,7 +245,21 @@ func ConfigureBeaconChain(ctx *cli.Context) {
 		log.Warn("Disabling init sync batch save blocks mode")
 		cfg.NoInitSyncBatchSaveBlocks = true
 	}
+	if ctx.Bool(enableStateRefCopy.Name) {
+		log.Warn("Enabling state reference copy")
+		cfg.EnableStateRefCopy = true
+	}
+	if ctx.Bool(broadcastSlashingFlag.Name) {
+		log.Warn("Enabling broadcast slashing to p2p network")
+		cfg.BroadcastSlashings = true
+	}
 	Init(cfg)
+}
+
+// ConfigureSlasher sets the global config based
+// on what flags are enabled for the slasher client.
+func ConfigureSlasher(ctx *cli.Context) {
+	complainOnDeprecatedFlags(ctx)
 }
 
 // ConfigureValidator sets the global config based
@@ -218,6 +285,18 @@ func ConfigureValidator(ctx *cli.Context) {
 	Init(cfg)
 }
 
+// enableDevModeFlags switches development mode features on.
+func enableDevModeFlags(ctx *cli.Context) {
+	log.Warn("Enabling development mode flags")
+	for _, f := range devModeFlags {
+		if !ctx.IsSet(f.Names()[0]) {
+			if err := ctx.Set(f.Names()[0], "true"); err != nil {
+				log.WithError(err).Debug("Error enabling development mode flag")
+			}
+		}
+	}
+}
+
 func complainOnDeprecatedFlags(ctx *cli.Context) {
 	for _, f := range deprecatedFlags {
 		if ctx.IsSet(f.Names()[0]) {
@@ -227,27 +306,12 @@ func complainOnDeprecatedFlags(ctx *cli.Context) {
 }
 
 func configureConfig(ctx *cli.Context, cfg *Flags) *Flags {
-	if ctx.Bool(noCustomConfigFlag.Name) {
-		log.Warn("Using default mainnet config")
-		cfg.NoCustomConfig = true
-	}
 	if ctx.Bool(minimalConfigFlag.Name) {
 		log.Warn("Using minimal config")
 		cfg.MinimalConfig = true
-	}
-	// Use custom config values if the --no-custom-config flag is not set.
-	if !cfg.NoCustomConfig {
-		if cfg.MinimalConfig {
-			log.WithField(
-				"config", "minimal-spec",
-			).Info("Using custom chain parameters")
-			params.UseMinimalConfig()
-		} else {
-			log.WithField(
-				"config", "demo",
-			).Info("Using custom chain parameters")
-			params.UseDemoBeaconConfig()
-		}
+		params.UseMinimalConfig()
+	} else {
+		log.Warn("Using default mainnet config")
 	}
 	return cfg
 }

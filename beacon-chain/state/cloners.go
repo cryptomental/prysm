@@ -86,10 +86,11 @@ func CopyBeaconBlock(block *ethpb.BeaconBlock) *ethpb.BeaconBlock {
 		return nil
 	}
 	return &ethpb.BeaconBlock{
-		Slot:       block.Slot,
-		ParentRoot: bytesutil.SafeCopyBytes(block.ParentRoot),
-		StateRoot:  bytesutil.SafeCopyBytes(block.StateRoot),
-		Body:       CopyBeaconBlockBody(block.Body),
+		Slot:          block.Slot,
+		ProposerIndex: block.ProposerIndex,
+		ParentRoot:    bytesutil.SafeCopyBytes(block.ParentRoot),
+		StateRoot:     bytesutil.SafeCopyBytes(block.StateRoot),
+		Body:          CopyBeaconBlockBody(block.Body),
 	}
 }
 
@@ -128,9 +129,8 @@ func CopyProposerSlashing(slashing *ethpb.ProposerSlashing) *ethpb.ProposerSlash
 		return nil
 	}
 	return &ethpb.ProposerSlashing{
-		ProposerIndex: slashing.ProposerIndex,
-		Header_1:      CopySignedBeaconBlockHeader(slashing.Header_1),
-		Header_2:      CopySignedBeaconBlockHeader(slashing.Header_2),
+		Header_1: CopySignedBeaconBlockHeader(slashing.Header_1),
+		Header_2: CopySignedBeaconBlockHeader(slashing.Header_2),
 	}
 }
 
@@ -154,10 +154,11 @@ func CopyBeaconBlockHeader(header *ethpb.BeaconBlockHeader) *ethpb.BeaconBlockHe
 	stateRoot := bytesutil.SafeCopyBytes(header.StateRoot)
 	bodyRoot := bytesutil.SafeCopyBytes(header.BodyRoot)
 	return &ethpb.BeaconBlockHeader{
-		Slot:       header.Slot,
-		ParentRoot: parentRoot[:],
-		StateRoot:  stateRoot[:],
-		BodyRoot:   bodyRoot[:],
+		Slot:          header.Slot,
+		ProposerIndex: header.ProposerIndex,
+		ParentRoot:    parentRoot[:],
+		StateRoot:     stateRoot[:],
+		BodyRoot:      bodyRoot[:],
 	}
 }
 
@@ -263,5 +264,23 @@ func CopySignedVoluntaryExit(exit *ethpb.SignedVoluntaryExit) *ethpb.SignedVolun
 			ValidatorIndex: exit.Exit.ValidatorIndex,
 		},
 		Signature: bytesutil.SafeCopyBytes(exit.Signature),
+	}
+}
+
+// CopyValidator copies the provided validator.
+func CopyValidator(val *ethpb.Validator) *ethpb.Validator {
+	pubKey := make([]byte, len(val.PublicKey))
+	copy(pubKey, val.PublicKey)
+	withdrawalCreds := make([]byte, len(val.WithdrawalCredentials))
+	copy(withdrawalCreds, val.WithdrawalCredentials)
+	return &ethpb.Validator{
+		PublicKey:                  pubKey[:],
+		WithdrawalCredentials:      withdrawalCreds,
+		EffectiveBalance:           val.EffectiveBalance,
+		Slashed:                    val.Slashed,
+		ActivationEligibilityEpoch: val.ActivationEligibilityEpoch,
+		ActivationEpoch:            val.ActivationEpoch,
+		ExitEpoch:                  val.ExitEpoch,
+		WithdrawableEpoch:          val.WithdrawableEpoch,
 	}
 }

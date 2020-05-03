@@ -1,3 +1,6 @@
+// Package attestations defines an attestation pool
+// service implementation which is used to manage the lifecycle
+// of aggregated, unaggregated, and fork-choice attestations.
 package attestations
 
 import (
@@ -43,7 +46,6 @@ func NewService(ctx context.Context, cfg *Config) (*Service, error) {
 // Start an attestation pool service's main event loop.
 func (s *Service) Start() {
 	go s.prepareForkChoiceAtts()
-	go s.aggregateRoutine()
 	go s.pruneAttsPool()
 }
 

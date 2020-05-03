@@ -1,6 +1,7 @@
 package accounts
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -12,7 +13,11 @@ import (
 
 func TestNewValidatorAccount_AccountExists(t *testing.T) {
 	directory := testutil.TempDir() + "/testkeystore"
-	defer os.RemoveAll(directory)
+	defer func() {
+		if err := os.RemoveAll(directory); err != nil {
+			t.Logf("Could not remove directory: %v", err)
+		}
+	}()
 	validatorKey, err := keystore.NewKey()
 	if err != nil {
 		t.Fatalf("Cannot create new key: %v", err)
@@ -24,14 +29,23 @@ func TestNewValidatorAccount_AccountExists(t *testing.T) {
 	if err := NewValidatorAccount(directory, ""); err != nil {
 		t.Errorf("Should support multiple keys: %v", err)
 	}
-	files, _ := ioutil.ReadDir(directory)
+	files, err := ioutil.ReadDir(directory)
+	if err != nil {
+		t.Error(err)
+	}
 	if len(files) != 3 {
 		t.Errorf("multiple validators were not created only %v files in directory", len(files))
 		for _, f := range files {
 			t.Errorf("%v\n", f.Name())
 		}
 	}
-	if err := os.RemoveAll(directory); err != nil {
-		t.Fatalf("Could not remove directory: %v", err)
+}
+
+func TestNewValidatorAccount_CreateValidatorAccount(t *testing.T) {
+	directory := "foobar"
+	_, _, err := CreateValidatorAccount(directory, "foobar")
+	wantErrString := fmt.Sprintf("path %q does not exist", directory)
+	if err == nil || err.Error() != wantErrString {
+		t.Errorf("expected error not thrown, want: %v, got: %v", wantErrString, err)
 	}
 }

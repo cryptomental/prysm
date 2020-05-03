@@ -1,3 +1,6 @@
+// Package state defines how the beacon chain state for eth2
+// functions in the running beacon node, using an advanced,
+// immutable implementation of the state data structure.
 package state
 
 import (
@@ -35,6 +38,7 @@ type dataType int
 // of the beacon state.
 const (
 	genesisTime fieldIndex = iota
+	genesisValidatorRoot
 	slot
 	fork
 	latestBlockHeader

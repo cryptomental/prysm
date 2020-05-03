@@ -10,6 +10,7 @@ import (
 	pbp2p "github.com/prysmaticlabs/prysm/proto/beacon/p2p/v1"
 	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/memorypool"
+	"github.com/prysmaticlabs/prysm/shared/params"
 )
 
 // EffectiveBalance returns the effective balance of the
@@ -78,6 +79,11 @@ func (v *ReadOnlyValidator) Slashed() bool {
 	return v.validator.Slashed
 }
 
+// CopyValidator returns the copy of the read only validator.
+func (v *ReadOnlyValidator) CopyValidator() *ethpb.Validator {
+	return CopyValidator(v.validator)
+}
+
 // InnerStateUnsafe returns the pointer value of the underlying
 // beacon state proto object, bypassing immutability. Use with care.
 func (b *BeaconState) InnerStateUnsafe() *pbp2p.BeaconState {
@@ -94,6 +100,7 @@ func (b *BeaconState) CloneInnerState() *pbp2p.BeaconState {
 	}
 	return &pbp2p.BeaconState{
 		GenesisTime:                 b.GenesisTime(),
+		GenesisValidatorsRoot:       b.GenesisValidatorRoot(),
 		Slot:                        b.Slot(),
 		Fork:                        b.Fork(),
 		LatestBlockHeader:           b.LatestBlockHeader(),
@@ -119,7 +126,7 @@ func (b *BeaconState) CloneInnerState() *pbp2p.BeaconState {
 // HasInnerState detects if the internal reference to the state data structure
 // is populated correctly. Returns false if nil.
 func (b *BeaconState) HasInnerState() bool {
-	return b.state != nil
+	return b != nil && b.state != nil
 }
 
 // GenesisTime of the beacon state as a uint64.
@@ -128,6 +135,21 @@ func (b *BeaconState) GenesisTime() uint64 {
 		return 0
 	}
 	return b.state.GenesisTime
+}
+
+// GenesisValidatorRoot of the beacon state.
+func (b *BeaconState) GenesisValidatorRoot() []byte {
+	if !b.HasInnerState() {
+		return nil
+	}
+
+	if b.state.GenesisValidatorsRoot == nil {
+		return params.BeaconConfig().ZeroHash[:]
+	}
+
+	root := make([]byte, 32)
+	copy(root, b.state.GenesisValidatorsRoot)
+	return root
 }
 
 // GenesisUnixTime returns the genesis time as time.Time.
@@ -185,7 +207,8 @@ func (b *BeaconState) LatestBlockHeader() *ethpb.BeaconBlockHeader {
 	defer b.lock.RUnlock()
 
 	hdr := &ethpb.BeaconBlockHeader{
-		Slot: b.state.LatestBlockHeader.Slot,
+		Slot:          b.state.LatestBlockHeader.Slot,
+		ProposerIndex: b.state.LatestBlockHeader.ProposerIndex,
 	}
 
 	parentRoot := make([]byte, len(b.state.LatestBlockHeader.ParentRoot))
@@ -348,20 +371,7 @@ func (b *BeaconState) Validators() []*ethpb.Validator {
 		if val == nil {
 			continue
 		}
-		pubKey := make([]byte, len(val.PublicKey))
-		copy(pubKey, val.PublicKey)
-		withdrawalCreds := make([]byte, len(val.WithdrawalCredentials))
-		copy(withdrawalCreds, val.WithdrawalCredentials)
-		res[i] = &ethpb.Validator{
-			PublicKey:                  pubKey[:],
-			WithdrawalCredentials:      withdrawalCreds,
-			EffectiveBalance:           val.EffectiveBalance,
-			Slashed:                    val.Slashed,
-			ActivationEligibilityEpoch: val.ActivationEligibilityEpoch,
-			ActivationEpoch:            val.ActivationEpoch,
-			ExitEpoch:                  val.ExitEpoch,
-			WithdrawableEpoch:          val.WithdrawableEpoch,
-		}
+		res[i] = CopyValidator(val)
 	}
 	return res
 }
@@ -441,7 +451,7 @@ func (b *BeaconState) ValidatorAtIndexReadOnly(idx uint64) (*ReadOnlyValidator, 
 // ValidatorIndexByPubkey returns a given validator by its 48-byte public key.
 func (b *BeaconState) ValidatorIndexByPubkey(key [48]byte) (uint64, bool) {
 	b.lock.RLock()
-	b.lock.RUnlock()
+	defer b.lock.RUnlock()
 	idx, ok := b.valIdxMap[key]
 	return idx, ok
 }

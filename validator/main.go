@@ -1,3 +1,6 @@
+// Package main defines a validator client, a critical actor in eth2 which manages
+// a keystore of private keys, connects to a beacon node to receive assignments,
+// and submits blocks/attestations as needed.
 package main
 
 import (
@@ -35,7 +38,6 @@ func startNode(ctx *cli.Context) error {
 }
 
 var appFlags = []cli.Flag{
-	flags.NoCustomConfigFlag,
 	flags.BeaconRPCProviderFlag,
 	flags.CertFlag,
 	flags.GraffitiFlag,
@@ -59,7 +61,7 @@ var appFlags = []cli.Flag{
 	cmd.TracingProcessNameFlag,
 	cmd.TracingEndpointFlag,
 	cmd.TraceSampleFractionFlag,
-	cmd.MonitoringPortFlag,
+	flags.MonitoringPortFlag,
 	cmd.LogFormat,
 	debug.PProfFlag,
 	debug.PProfAddrFlag,
@@ -99,16 +101,9 @@ contract in order to activate the validator client`,
 					},
 					Action: func(ctx *cli.Context) error {
 						featureconfig.ConfigureValidator(ctx)
-						// Use custom config values if the --no-custom-config flag is set.
-						if !ctx.Bool(flags.NoCustomConfigFlag.Name) {
-							log.Info("Using custom parameter configuration")
-							if featureconfig.Get().MinimalConfig {
-								log.Warn("Using Minimal Config")
-								params.UseMinimalConfig()
-							} else {
-								log.Warn("Using Demo Config")
-								params.UseDemoBeaconConfig()
-							}
+						if featureconfig.Get().MinimalConfig {
+							log.Warn("Using Minimal Config")
+							params.UseMinimalConfig()
 						}
 
 						if keystoreDir, _, err := accounts.CreateValidatorAccount(ctx.String(flags.KeystorePathFlag.Name), ctx.String(flags.PasswordFlag.Name)); err != nil {

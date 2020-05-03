@@ -3,7 +3,9 @@ package kv
 import (
 	"context"
 	"fmt"
+	"runtime"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
 	"github.com/prysmaticlabs/go-ssz"
@@ -11,10 +13,16 @@ import (
 	transition "github.com/prysmaticlabs/prysm/beacon-chain/core/state"
 	"github.com/prysmaticlabs/prysm/beacon-chain/db/filters"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
+	"github.com/prysmaticlabs/prysm/shared/bytesutil"
 	"github.com/prysmaticlabs/prysm/shared/params"
 	log "github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 )
+
+// Using max possible size to avoid using DB to save and retrieve pre state (slow)
+// The size is 80 because block at slot 43772 built on top of block at slot 43693.
+// That is the worst case.
+const historicalStatesSize = 80
 
 func (kv *Store) regenHistoricalStates(ctx context.Context) error {
 	ctx, span := trace.StartSpan(ctx, "db.regenHistoricalStates")
@@ -54,7 +62,17 @@ func (kv *Store) regenHistoricalStates(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	cacheState, err := lru.New(historicalStatesSize)
+	if err != nil {
+		return err
+	}
 	for i := lastArchivedIndex; i <= lastSavedBlockArchivedIndex; i++ {
+		// This is an expensive operation, so we check if the context was canceled
+		// at any point in the iteration.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		targetSlot := startSlot + slotsPerArchivedPoint
 		filter := filters.NewFilter().SetStartSlot(startSlot + 1).SetEndSlot(targetSlot)
 		blocks, err := kv.Blocks(ctx, filter)
@@ -68,23 +86,44 @@ func (kv *Store) regenHistoricalStates(ctx context.Context) error {
 				if blocks[i].Block.Slot == 0 {
 					continue
 				}
-				currentState, err = regenHistoricalStateTransition(ctx, currentState, blocks[i])
+
+				var preState *stateTrie.BeaconState
+				item, ok := cacheState.Get(bytesutil.ToBytes32(blocks[i].Block.ParentRoot))
+				if !ok {
+					preState, err = kv.State(ctx, bytesutil.ToBytes32(blocks[i].Block.ParentRoot))
+					if err != nil {
+						return err
+					}
+				} else {
+					preState = item.(*stateTrie.BeaconState).Copy()
+				}
+				if preState == nil {
+					return errors.New("pre state can't be nil")
+				}
+
+				currentState, err = regenHistoricalStateTransition(ctx, preState.Copy(), blocks[i])
+				if err != nil {
+					return errors.Wrap(err, "could not regenerate historical state transition")
+				}
+
+				r, err := ssz.HashTreeRoot(blocks[i].Block)
 				if err != nil {
 					return err
 				}
+				cacheState.Add(r, currentState)
 			}
 		}
 		if targetSlot > currentState.Slot() {
 			currentState, err = regenHistoricalStateProcessSlots(ctx, currentState, targetSlot)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not regenerate historical process slot")
 			}
 		}
 
 		if len(blocks) > 0 {
 			// Save the historical root, state and highest index to the DB.
-			if helpers.IsEpochStart(currentState.Slot()) && currentState.Slot()%slotsPerArchivedPoint == 0 && blocks[len(blocks)-1].Block.Slot&slotsPerArchivedPoint == 0 {
-				if err := kv.saveArchivedInfo(ctx, currentState, blocks, i); err != nil {
+			if helpers.IsEpochStart(currentState.Slot()) && currentState.Slot()%slotsPerArchivedPoint == 0 {
+				if err := kv.saveArchivedInfo(ctx, currentState.Copy(), blocks, i); err != nil {
 					return err
 				}
 				log.WithFields(log.Fields{
@@ -94,6 +133,13 @@ func (kv *Store) regenHistoricalStates(ctx context.Context) error {
 		}
 		startSlot += slotsPerArchivedPoint
 	}
+
+	// Flush the cache, the cached states never be used again.
+	cacheState.Purge()
+
+	// Manually garbage collect as previous cache will never be used again.
+	runtime.GC()
+
 	return nil
 }
 

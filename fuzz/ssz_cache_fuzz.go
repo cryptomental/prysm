@@ -6,7 +6,8 @@ import (
 	"github.com/prysmaticlabs/prysm/shared/featureconfig"
 )
 
-func FuzzSSZCache(input []byte) {
+// BeaconFuzzSSZCache for testing critical paths along the ssz cache for beacon state HTR.
+func BeaconFuzzSSZCache(input []byte) {
 	s := &pb.BeaconState{}
 	if err := s.UnmarshalSSZ(input); err != nil {
 		return

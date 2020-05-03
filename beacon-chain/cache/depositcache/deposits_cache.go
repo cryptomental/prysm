@@ -1,3 +1,7 @@
+// Package depositcache is the source of validator deposits maintained
+// in-memory by the beacon node – deposits processed from the
+// eth1 powchain are then stored in this cache to be accessed by
+// any other service during a beacon node's runtime.
 package depositcache
 
 import (
@@ -35,12 +39,11 @@ type DepositFetcher interface {
 // stores all the deposit related data that is required by the beacon-node.
 type DepositCache struct {
 	// Beacon chain deposits in memory.
-	pendingDeposits       []*dbpb.DepositContainer
-	deposits              []*dbpb.DepositContainer
-	depositsLock          sync.RWMutex
-	chainStartDeposits    []*ethpb.Deposit
-	chainstartPubkeys     map[string]bool
-	chainstartPubkeysLock sync.RWMutex
+	pendingDeposits    []*dbpb.DepositContainer
+	deposits           []*dbpb.DepositContainer
+	depositsLock       sync.RWMutex
+	chainStartDeposits []*ethpb.Deposit
+	chainStartPubkeys  map[string]bool
 }
 
 // NewDepositCache instantiates a new deposit cache
@@ -48,7 +51,7 @@ func NewDepositCache() *DepositCache {
 	return &DepositCache{
 		pendingDeposits:    []*dbpb.DepositContainer{},
 		deposits:           []*dbpb.DepositContainer{},
-		chainstartPubkeys:  make(map[string]bool),
+		chainStartPubkeys:  make(map[string]bool),
 		chainStartDeposits: make([]*ethpb.Deposit, 0),
 	}
 }
@@ -102,21 +105,17 @@ func (dc *DepositCache) AllDepositContainers(ctx context.Context) []*dbpb.Deposi
 func (dc *DepositCache) MarkPubkeyForChainstart(ctx context.Context, pubkey string) {
 	ctx, span := trace.StartSpan(ctx, "DepositsCache.MarkPubkeyForChainstart")
 	defer span.End()
-	dc.chainstartPubkeysLock.Lock()
-	defer dc.chainstartPubkeysLock.Unlock()
-	dc.chainstartPubkeys[pubkey] = true
+	dc.chainStartPubkeys[pubkey] = true
 }
 
 // PubkeyInChainstart returns bool for whether the pubkey passed in has deposited.
 func (dc *DepositCache) PubkeyInChainstart(ctx context.Context, pubkey string) bool {
 	ctx, span := trace.StartSpan(ctx, "DepositsCache.PubkeyInChainstart")
 	defer span.End()
-	dc.chainstartPubkeysLock.Lock()
-	defer dc.chainstartPubkeysLock.Unlock()
-	if dc.chainstartPubkeys != nil {
-		return dc.chainstartPubkeys[pubkey]
+	if dc.chainStartPubkeys != nil {
+		return dc.chainStartPubkeys[pubkey]
 	}
-	dc.chainstartPubkeys = make(map[string]bool)
+	dc.chainStartPubkeys = make(map[string]bool)
 	return false
 }
 

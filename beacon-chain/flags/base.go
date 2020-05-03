@@ -1,3 +1,5 @@
+// Package flags defines beacon-node specific runtime flags for
+// setting important values such as ports, eth1 endpoints, and more.
 package flags
 
 import (
@@ -21,7 +23,7 @@ var (
 	DepositContractFlag = &cli.StringFlag{
 		Name:  "deposit-contract",
 		Usage: "Deposit contract address. Beacon chain node will listen logs coming from the deposit contract to determine when validator is eligible to participate.",
-		Value: "0x4689a3C63CE249355C8a573B5974db21D2d1b8Ef",
+		Value: "0x5cA1e00004366Ac85f492887AAab12d0e6418876",
 	}
 	// RPCHost defines the host on which the RPC server should listen.
 	RPCHost = &cli.StringFlag{
@@ -41,6 +43,12 @@ var (
 		Name:  "rpc-max-page-size",
 		Usage: "Max number of items returned per page in RPC responses for paginated endpoints.",
 		Value: 500,
+	}
+	// MonitoringPortFlag defines the http port used to serve prometheus metrics.
+	MonitoringPortFlag = &cli.Int64Flag{
+		Name:  "monitoring-port",
+		Usage: "Port used to listening and respond metrics for prometheus.",
+		Value: 8080,
 	}
 	// CertFlag defines a flag for the node's TLS certificate.
 	CertFlag = &cli.StringFlag{
@@ -74,7 +82,7 @@ var (
 	ContractDeploymentBlock = &cli.IntFlag{
 		Name:  "contract-deployment-block",
 		Usage: "The eth1 block in which the deposit contract was deployed.",
-		Value: 1960177,
+		Value: 2523557,
 	}
 	// SetGCPercent is the percentage of current live allocations at which the garbage collector is to run.
 	SetGCPercent = &cli.IntFlag{
@@ -105,9 +113,20 @@ var (
 		Usage: "The slot durations of when an archived state gets saved in the DB.",
 		Value: 128,
 	}
-	// EnableDiscv5 enables running discv5.
-	EnableDiscv5 = &cli.BoolFlag{
-		Name:  "enable-discv5",
-		Usage: "Starts dv5 dht.",
+	// DisableDiscv5 disables running discv5.
+	DisableDiscv5 = &cli.BoolFlag{
+		Name:  "disable-discv5",
+		Usage: "Does not run the discoveryV5 dht.",
+	}
+	// BlockBatchLimit specifies the requested block batch size.
+	BlockBatchLimit = &cli.IntFlag{
+		Name:  "block-batch-limit",
+		Usage: "The amount of blocks the local peer is bounded to request and respond to in a batch.",
+		Value: 64,
+	}
+	// EnableDebugRPCEndpoints as /v1/beacon/state.
+	EnableDebugRPCEndpoints = &cli.BoolFlag{
+		Name:  "enable-debug-rpc-endpoints",
+		Usage: "Enables the debug rpc service, containing utility endpoints such as /eth/v1alpha1/beacon/state. Requires --new-state-mgmt",
 	}
 )

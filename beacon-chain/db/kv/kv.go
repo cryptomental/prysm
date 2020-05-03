@@ -1,7 +1,8 @@
+// Package kv defines a bolt-db, key-value store implementation
+// of the Database interface defined by a Prysm beacon node.
 package kv
 
 import (
-	"context"
 	"os"
 	"path"
 	"sync"
@@ -117,10 +118,6 @@ func NewKVStore(dirPath string, stateSummaryCache *cache.StateSummaryCache) (*St
 			newStateServiceCompatibleBucket,
 		)
 	}); err != nil {
-		return nil, err
-	}
-
-	if err := kv.ensureNewStateServiceCompatible(context.Background()); err != nil {
 		return nil, err
 	}
 

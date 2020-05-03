@@ -5,11 +5,11 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "b5a8039df7119d618402472f3adff8a1bd0ae9d5e253f53fcc4c47122e91a3d2",
-    strip_prefix = "bazel-toolchains-2.1.1",
+    sha256 = "144290c4166bd67e76a54f96cd504ed86416ca3ca82030282760f0823c10be48",
+    strip_prefix = "bazel-toolchains-3.1.1",
     urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.1.1/bazel-toolchains-2.1.1.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.1.1.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.1.1/bazel-toolchains-3.1.1.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/3.1.1.tar.gz",
     ],
 )
 
@@ -60,10 +60,6 @@ bazel_skylib_workspace()
 
 http_archive(
     name = "bazel_gazelle",
-    patch_args = ["-p1"],
-    patches = [
-        "//third_party:bazel-gazelle.patch",  # Temporary hack to apply libfuzz gc_opts to all external deps.
-    ],
     sha256 = "d8c45ee70ec39a57e7a05e5027c32b1576cc7f16d9dd37135b0eddde45cf1b10",
     urls = [
         "https://storage.googleapis.com/bazel-mirror/github.com/bazelbuild/bazel-gazelle/releases/download/v0.20.0/bazel-gazelle-v0.20.0.tar.gz",
@@ -87,10 +83,10 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "142dd33e38b563605f0d20e89d9ef9eda0fc3cb539a14be1bdb1350de2eda659",
+    sha256 = "7b9bbe3ea1fccb46dcfa6c3f3e29ba7ec740d8733370e21cdc8937467b4a4349",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.22.2/rules_go-v0.22.2.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/v0.22.2/rules_go-v0.22.2.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/v0.22.4/rules_go-v0.22.4.tar.gz",
+        "https://github.com/bazelbuild/rules_go/releases/download/v0.22.4/rules_go-v0.22.4.tar.gz",
     ],
 )
 
@@ -99,12 +95,6 @@ http_archive(
     build_file_content = "exports_files([\"fuzzit\"])",
     sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
     urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
-)
-
-http_archive(
-    name = "build_bazel_rules_nodejs",
-    sha256 = "0942d188f4d0de6ddb743b9f6642a26ce1ad89f09c0035a9a5ca5ba9615c96aa",
-    urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/0.38.1/rules_nodejs-0.38.1.tar.gz"],
 )
 
 git_repository(
@@ -148,6 +138,13 @@ container_pull(
     repository = "frolvlad/alpine-glibc",
 )
 
+container_pull(
+    name = "fuzzit_base",
+    digest = "sha256:24a39a4360b07b8f0121eb55674a2e757ab09f0baff5569332fefd227ee4338f",
+    registry = "gcr.io",
+    repository = "fuzzit-public/stretch-llvm8",
+)
+
 load("@prysm//third_party/herumi:herumi.bzl", "bls_dependencies")
 
 bls_dependencies()
@@ -158,7 +155,8 @@ go_rules_dependencies()
 
 go_register_toolchains(nogo = "@//:nogo")
 
-load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
+load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
+load("@prysm//tools/go:def.bzl", "go_repository")
 
 gazelle_dependencies()
 
@@ -216,8 +214,8 @@ filegroup(
     visibility = ["//visibility:public"],
 )
     """,
-    sha256 = "72c6ee3c20d19736b1203f364a6eb0ddee2c173073e20bee2beccd288fdc42be",
-    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.9.4/general.tar.gz",
+    sha256 = "b90221d87b3b4cb17d7f195f8852f5dd8fec1cf623d42443b97bdb5a216ae61d",
+    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.11.1/general.tar.gz",
 )
 
 http_archive(
@@ -232,8 +230,8 @@ filegroup(
     visibility = ["//visibility:public"],
 )
     """,
-    sha256 = "a3cc860a3679f6f62ee57b65677a9b48a65fdebb151cdcbf50f23852632845ef",
-    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.9.4/minimal.tar.gz",
+    sha256 = "316b227c0198f55872e46d601a578afeac88aab36ed38e3f01af753e98db156f",
+    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.11.1/minimal.tar.gz",
 )
 
 http_archive(
@@ -248,8 +246,8 @@ filegroup(
     visibility = ["//visibility:public"],
 )
     """,
-    sha256 = "8fc1b6220973ca30fa4ddc4ed24d66b1719abadca8bedb5e06c3bd9bc0df28e9",
-    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.9.4/mainnet.tar.gz",
+    sha256 = "b9c52f60293bcc1acfd4f8ab7ddf8bf8222ddd6a105e93d384542d1396e1b07a",
+    url = "https://github.com/ethereum/eth2.0-spec-tests/releases/download/v0.11.1/mainnet.tar.gz",
 )
 
 http_archive(
@@ -271,7 +269,7 @@ go_repository(
 
 git_repository(
     name = "com_google_protobuf",
-    commit = "4cf5bfee9546101d98754d23ff378ff718ba8438",
+    commit = "4059c61f27eb1b06c4ee979546a238be792df0a4",
     remote = "https://github.com/protocolbuffers/protobuf",
     shallow_since = "1558721209 -0700",
 )
@@ -285,9 +283,9 @@ all_content = """filegroup(name = "all", srcs = glob(["**"]), visibility = ["//v
 
 http_archive(
     name = "rules_foreign_cc",
-    sha256 = "450563dc2938f38566a59596bb30a3e905fbbcc35b3fff5a1791b122bc140465",
-    strip_prefix = "rules_foreign_cc-456425521973736ef346d93d3d6ba07d807047df",
-    url = "https://github.com/bazelbuild/rules_foreign_cc/archive/456425521973736ef346d93d3d6ba07d807047df.zip",
+    sha256 = "b85ce66a3410f7370d1a9a61dfe3a29c7532b7637caeb2877d8d0dfd41d77abb",
+    strip_prefix = "rules_foreign_cc-3515b20a2417c4dd51c8a4a8cac1f6ecf3c6d934",
+    url = "https://github.com/bazelbuild/rules_foreign_cc/archive/3515b20a2417c4dd51c8a4a8cac1f6ecf3c6d934.zip",
 )
 
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
@@ -307,16 +305,18 @@ http_archive(
 http_archive(
     name = "sigp_beacon_fuzz_corpora",
     build_file = "//third_party:beacon-fuzz/corpora.BUILD",
-    sha256 = "72c947b6b92df0db7275189be77733209f12af2aa931b81917b952c8d93e4c9f",
-    strip_prefix = "beacon-fuzz-corpora-c6d956ce22bd91f0d2929eb6401e40adfd7a8c89",
-    urls = ["https://github.com/sigp/beacon-fuzz-corpora/archive/c6d956ce22bd91f0d2929eb6401e40adfd7a8c89.tar.gz"],
+    sha256 = "42993d0901a316afda45b4ba6d53c7c21f30c551dcec290a4ca131c24453d1ef",
+    strip_prefix = "beacon-fuzz-corpora-bac24ad78d45cc3664c0172241feac969c1ac29b",
+    urls = [
+        "https://github.com/sigp/beacon-fuzz-corpora/archive/bac24ad78d45cc3664c0172241feac969c1ac29b.tar.gz",
+    ],
 )
 
 # External dependencies
 
 go_repository(
     name = "com_github_ethereum_go_ethereum",
-    commit = "861ae1b1875c17d86a6a5d68118708ab2b099658",
+    commit = "0beb54b2147b3473a4c55e5ce6f02643ce403b14",
     importpath = "github.com/ethereum/go-ethereum",
     # Note: go-ethereum is not bazel-friendly with regards to cgo. We have a
     # a fork that has resolved these issues by disabling HID/USB support and
@@ -1137,8 +1137,9 @@ go_repository(
 
 go_repository(
     name = "grpc_ecosystem_grpc_gateway",
-    commit = "da7a886035e25b2f274f89b6f3c64bf70a9f6780",
     importpath = "github.com/grpc-ecosystem/grpc-gateway",
+    sum = "h1:IOPK2xMPP3aV6/NPt4jt//ELFo3Vv8sDVD8j3+tleDU=",
+    version = "v1.14.4",
 )
 
 go_repository(
@@ -1332,12 +1333,8 @@ go_repository(
 
 go_repository(
     name = "com_github_prysmaticlabs_ethereumapis",
-    commit = "62fd1d2ec119bc93b0473fde17426c63a85197ed",
+    commit = "ba9042096e9fc49606279513d3e24e5e8cdbd5a0",
     importpath = "github.com/prysmaticlabs/ethereumapis",
-    patch_args = ["-p1"],
-    patches = [
-        "//third_party:com_github_prysmaticlabs_ethereumapis-tags.patch",
-    ],
 )
 
 go_repository(
@@ -1535,74 +1532,89 @@ go_repository(
 
 go_repository(
     name = "com_github_wealdtech_go_eth2_wallet",
-    commit = "6970d62e60d86fdae3c3e510e800e8a60d755a7d",
     importpath = "github.com/wealdtech/go-eth2-wallet",
+    sum = "h1:Hna/w4EKBJIs86VprIq7ez063A6kwk31d/O3Gs+MpYc=",
+    version = "v1.9.3",
 )
 
 go_repository(
-    name = "com_github_wealdtech_go_eth2_wallet_hd",
-    commit = "ce0a252a01c621687e9786a64899cfbfe802ba73",
-    importpath = "github.com/wealdtech/go-eth2-wallet-hd",
+    name = "com_github_wealdtech_go_eth2_wallet_hd_v2",
+    importpath = "github.com/wealdtech/go-eth2-wallet-hd/v2",
+    sum = "h1:kiCvdexK3zRC2GwZHSHq+hS+irVNtMs5pNADyumeeRM=",
+    version = "v2.0.1",
 )
 
 go_repository(
-    name = "com_github_wealdtech_go_eth2_wallet_nd",
-    commit = "12c8c41cdbd16797ff292e27f58e126bb89e9706",
-    importpath = "github.com/wealdtech/go-eth2-wallet-nd",
+    name = "com_github_wealdtech_go_eth2_wallet_nd_v2",
+    importpath = "github.com/wealdtech/go-eth2-wallet-nd/v2",
+    sum = "h1:4lB6GY5oHQn5xwn/Sxm1e9SeVCaxa7q/0hqXUQYUNwU=",
+    version = "v2.0.1",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_eth2_wallet_store_filesystem",
-    commit = "1eea6a48d75380047d2ebe7c8c4bd8985bcfdeca",
     importpath = "github.com/wealdtech/go-eth2-wallet-store-filesystem",
+    sum = "h1:Lc6wVTjIYeD+2hLAIzq1SugTWR527vEX4tEr5v3zxJc=",
+    version = "v1.7.2",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_eth2_wallet_store_s3",
-    commit = "1c821b5161f7bb0b3efa2030eff687eea5e70e53",
     importpath = "github.com/wealdtech/go-eth2-wallet-store-s3",
+    sum = "h1:xzyQDxbe5nr7xG0ByevTV2S8qkeOZvvjp+leBJcpxXQ=",
+    version = "v1.6.2",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_eth2_wallet_encryptor_keystorev4",
-    commit = "0c11c07b9544eb662210fadded94f40f309d8c8f",
     importpath = "github.com/wealdtech/go-eth2-wallet-encryptor-keystorev4",
+    sum = "h1:IcpS4VpXhYz+TVupB5n6C6IQzaKwG+Rc8nvgCa/da4c=",
+    version = "v1.0.0",
 )
 
 go_repository(
-    name = "com_github_wealdtech_go_eth2_wallet_types",
-    commit = "af67d8101be61e7c4dd8126d2b3eba20cff5dab2",
-    importpath = "github.com/wealdtech/go-eth2-wallet-types",
+    name = "com_github_wealdtech_go_eth2_wallet_types_v2",
+    importpath = "github.com/wealdtech/go-eth2-wallet-types/v2",
+    sum = "h1:Ct3RrNJTapBiG2GxVl53Kfgy96f0GEUV7bediTu91u8=",
+    version = "v2.0.1",
 )
 
 go_repository(
-    name = "com_github_wealdtech_go_eth2_types",
-    commit = "f9c31ddf180537dd5712d5998a3d56c45864d71f",
-    importpath = "github.com/wealdtech/go-eth2-types",
+    name = "com_github_wealdtech_go_eth2_types_v2",
+    build_directives = [
+        "gazelle:resolve go github.com/herumi/bls-eth-go-binary/bls @herumi_bls_eth_go_binary//:go_default_library",
+    ],
+    importpath = "github.com/wealdtech/go-eth2-types/v2",
+    sum = "h1:qfmgaCBkH2N11LHCXsRWYz7OOxc+1QXrKHlS9yDnFsw=",
+    version = "v2.3.0",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_eth2_util",
-    commit = "326ebb1755651131bb8f4506ea9a23be6d9ad1dd",
     importpath = "github.com/wealdtech/go-eth2-util",
+    sum = "h1:MyM16V7Qhd9q2ZaRa0WteBg2bWb8UplIKjZr8aeBZP0=",
+    version = "v1.1.4",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_ecodec",
-    commit = "7473d835445a3490e61a5fcf48fe4e9755a37957",
     importpath = "github.com/wealdtech/go-ecodec",
+    sum = "h1:yggrTSckcPJRaxxOxQF7FPm21kgE8WA6+f5jdq5Kr8o=",
+    version = "v1.1.0",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_bytesutil",
-    commit = "e564d0ade555b9f97494f0f669196ddcc6bc531d",
     importpath = "github.com/wealdtech/go-bytesutil",
+    sum = "h1:ocEg3Ke2GkZ4vQw5lp46rmO+pfqCCTgq35gqOy8JKVc=",
+    version = "v1.1.1",
 )
 
 go_repository(
     name = "com_github_wealdtech_go_indexer",
-    commit = "334862c32b1e3a5c6738a2618f5c0a8ebeb8cd51",
     importpath = "github.com/wealdtech/go-indexer",
+    sum = "h1:/S4rfWQbSOnnYmwnvuTVatDibZ8o1s9bmTCHO16XINg=",
+    version = "v1.0.0",
 )
 
 go_repository(
@@ -1622,6 +1634,7 @@ go_repository(
     name = "com_github_ferranbt_fastssz",
     commit = "06015a5d84f9e4eefe2c21377ca678fa8f1a1b09",
     importpath = "github.com/ferranbt/fastssz",
+    nofuzz = True,
 )
 
 http_archive(
@@ -1694,6 +1707,14 @@ go_repository(
 )
 
 go_repository(
+    name = "com_github_wealdtech_eth2_signer_api",
+    build_file_proto_mode = "disable_global",
+    importpath = "github.com/wealdtech/eth2-signer-api",
+    sum = "h1:Fs0GfrdhboBKW7zaMvIvUHJaOB1ibpAmRG3lkB53in4=",
+    version = "v1.3.0",
+)
+
+go_repository(
     name = "com_github_prysmaticlabs_prombbolt",
     importpath = "github.com/prysmaticlabs/prombbolt",
     sum = "h1:bVD46NhbqEE6bsIqj42TCS3ELUdumti3WfAw9DXNtkg=",
@@ -1709,4 +1730,17 @@ go_repository(
     importpath = "github.com/ianlancetaylor/cgosymbolizer",
     sum = "h1:GWsU1WjSE2rtvyTYGcndqmPPkQkBNV7pEuZdnGtwtu4=",
     version = "v0.0.0-20200321040036-d43e30eacb43",
+)
+
+go_repository(
+    name = "org_golang_x_mod",
+    importpath = "golang.org/x/mod",
+    sum = "h1:KU7oHjnv3XNWfa5COkzUifxZmxp1TyI7ImMXqFxLwvQ=",
+    version = "v0.2.0",
+)
+
+go_repository(
+    name = "com_github_golang_gddo",
+    commit = "3c2cc9a6329d9842b3bbdaf307a8110d740cf94c",
+    importpath = "github.com/golang/gddo",
 )
