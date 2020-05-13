@@ -148,7 +148,6 @@ def go_fuzz_test(
         name = name + "_lib_with_fuzzer",
         tags = ["manual"] + tags,
         visibility = ["//visibility:private"],
-        testonly = 1,
         importpath = importpath,
         cgo = True,
         gc_goopts = ["-d=libfuzzer"],
@@ -159,7 +158,6 @@ def go_fuzz_test(
         target_pkg = importpath,
         func = func,
         tags = ["manual"] + tags,
-        testonly = 1,
         visibility = ["//visibility:private"],
     )
     gen_diff_fuzz_main(
@@ -167,7 +165,6 @@ def go_fuzz_test(
         target_pkg = importpath,
         func = func,
         tags = ["manual"] + tags,
-        testonly = 1,
         visibility = ["//visibility:private"],
     )
     go_binary(
@@ -179,7 +176,6 @@ def go_fuzz_test(
         tags = ["manual"] + tags,
         visibility = ["//visibility:private"],
         gc_goopts = ["-d=libfuzzer"],
-        testonly = 1,
     )
     go_binary(
         # For inclusion in beacon fuzz project, linkmode c-shared.
@@ -193,7 +189,6 @@ def go_fuzz_test(
         visibility = ["//visibility:private"],
         gc_goopts = ["-d=libfuzzer"],
         gc_linkopts=["-buildmode=c-shared"],
-        testonly = 1,
     )
     go_binary(
         # For inclusion in beacon fuzz project, linkmode c-archive.
@@ -206,7 +201,6 @@ def go_fuzz_test(
         tags = ["manual"] + tags,
         visibility = ["//visibility:private"],
         gc_goopts = ["-d=libfuzzer"],
-        testonly = 1,
     )
     native.genrule(
         name = name,
@@ -215,7 +209,6 @@ def go_fuzz_test(
         cmd = "cp $< $@",
         visibility = kwargs.get("visibility"),
         tags = ["manual"] + tags,
-        testonly = 1,
     )
 
     if not (corpus.startswith("//") or corpus.startswith(":") or corpus.startswith("@")):
@@ -236,7 +229,6 @@ def go_fuzz_test(
         name = name + "_with_libfuzzer",
         linkopts = ["-fsanitize=fuzzer,address"],
         copts = ["-fsantize=fuzzer,address"],
-        testonly = 1,
         linkstatic = False,
         srcs = [":" + name],
         deps = ["@herumi_bls_eth_go_binary//:lib"],

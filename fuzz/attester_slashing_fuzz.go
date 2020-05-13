@@ -6,6 +6,7 @@ import (
 	"context"
 
 	ethpb "github.com/prysmaticlabs/ethereumapis/eth/v1alpha1"
+	ssz "github.com/prysmaticlabs/go-ssz"
 	"github.com/prysmaticlabs/prysm/beacon-chain/core/blocks"
 	stateTrie "github.com/prysmaticlabs/prysm/beacon-chain/state"
 	prylabs_testing "github.com/prysmaticlabs/prysm/fuzz/testing"
@@ -16,8 +17,8 @@ import (
 func BeaconFuzzAttesterSlashing(b []byte) ([]byte, bool) {
 	params.UseMainnetConfig()
 	input := &InputAttesterSlashingWrapper{}
-	if err := input.UnmarshalSSZ(b); err != nil {
-	//if err := ssz.Unmarshal(b, input); err != nil {
+	//if err := input.UnmarshalSSZ(b); err != nil {
+	if err := ssz.Unmarshal(b, input); err != nil {
 		return fail(err)
 	}
 	s, err := prylabs_testing.GetBeaconFuzzState(input.StateID)
