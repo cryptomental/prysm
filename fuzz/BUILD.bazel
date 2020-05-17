@@ -229,6 +229,26 @@ go_fuzz_test(
 )
 
 go_library(
+    name = "bfuzz_library",
+    testonly = 1,
+    visibility = ["//visibility:public"],
+    gc_goopts = ["-d=libfuzzer"],
+    srcs = [
+        "block_fuzz.go",
+        "block_header_fuzz.go",
+        "proposer_slashing_fuzz.go",
+        "voluntary_exit_fuzz.go",
+    ] + COMMON_SRCS,
+    importpath = IMPORT_PATH,
+    deps = [
+        "//beacon-chain/core/blocks:go_default_library",
+        "//beacon-chain/core/state:go_default_library",
+        "//fuzz/testing:go_default_library",
+        "//shared/params:go_default_library",
+    ] + COMMON_DEPS,
+)
+
+go_library(
     name = "go_default_library",
     testonly = 1,
     srcs = [
